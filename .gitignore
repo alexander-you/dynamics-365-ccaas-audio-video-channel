@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────
+# Secrets & environment — NEVER commit these
+# ─────────────────────────────────────────────────────────────
+*.env
+.env
+.env.*
+!.env.example
+local.settings.json
+appsettings.*.local.json
+secrets.json
+*.pfx
+*.pem
+*.key
+*.publishsettings
+
+# Private documentation (tenant / environment specific notes)
+docs/private/**
+!docs/private/README.md
+!docs/private/*.template.md
+
+# ─────────────────────────────────────────────────────────────
+# Node / front-end
+# ─────────────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+out/
+coverage/
+*.log
+npm-debug.log*
+.pnp.*
+.cache/
+
+# ─────────────────────────────────────────────────────────────
+# .NET / Azure Functions
+# ─────────────────────────────────────────────────────────────
+bin/
+obj/
+*.user
+.vs/
+azure-functions-core-tools/
+
+# ─────────────────────────────────────────────────────────────
+# Power Platform / PCF
+# ─────────────────────────────────────────────────────────────
+**/Microsoft.PowerApps.CLI*/
+**/.pcfeslintrc.json
+*.msapp
+**/out/controls/
+generated/
+
+# ─────────────────────────────────────────────────────────────
+# OS / editor
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
