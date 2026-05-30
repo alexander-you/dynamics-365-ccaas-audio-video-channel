@@ -33,3 +33,24 @@ export const tokenService = {
   createSession: (req: SessionRequest) => postJson<SessionRequest, SessionResponse>("/api/session", req),
   captureConsent: (req: ConsentRecord) => postJson<ConsentRecord, ConsentResult>("/api/consent", req)
 };
+
+// Shape returned by the relay's POST /api/token (C5): { userId, token, expiresOn, endpoint }.
+interface RelayTokenResponse {
+  userId: string;
+  token: string;
+  expiresOn: string;
+  endpoint: string | null;
+}
+
+// Real-mode token fetch. The relay endpoint is anonymous and only mints an ACS VoIP token,
+// so the customer page calls it directly (no session/consent endpoints in the POC relay).
+export async function issueRelayToken(): Promise<TokenResponse> {
+  const data = await postJson<Record<string, never>, RelayTokenResponse>("/api/token", {});
+  return {
+    acsUserId: data.userId,
+    token: data.token,
+    expiresOn: data.expiresOn,
+    sessionId: "",
+    isMock: false
+  };
+}
