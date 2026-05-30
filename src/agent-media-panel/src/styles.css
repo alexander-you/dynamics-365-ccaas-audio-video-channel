@@ -61,6 +61,33 @@ body {
   border: 1px solid #bcd9bc;
 }
 
+.cif-badge {
+  font-size: 0.68rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.cif-cif {
+  background: #eaf2fb;
+  color: var(--accent);
+  border: 1px solid #b6d3f0;
+}
+
+.cif-standalone {
+  background: #f1f1f3;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.amp-cif {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  background: #fbfcfe;
+}
+
 .state {
   font-size: 0.72rem;
   text-transform: uppercase;
