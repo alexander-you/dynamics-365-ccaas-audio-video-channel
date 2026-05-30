@@ -69,6 +69,17 @@ Framework** app / `msdyn_*` provider tables) with these proposed values:
 - **POC:** create or use a **dedicated POC app profile** (not a production profile). Attach the
   `ACS Audio/Video (POC)` channel provider to it, and assign the profile to the test agent user(s).
 - This isolation guarantees the POC channel never appears for production agents.
+- **The provider loads from the *active* app profile for the user.** A user has exactly **one** app
+  profile per app. The widget surfaces only if the provider is attached to the profile the user is
+  actually on — attaching it to a different profile has no effect for that user.
+
+> **Surfacing ≠ routed conversation.** Attaching the provider to the active profile only makes the
+> widget **available to load**; it does not create a workstream, queue, routing, Dataverse session
+> schema, or a real work item. The widget loads in the **communication/side-pane provider area** of
+> the workspace; it is **not** auto-opened as a native conversation. See
+> [architecture.md](architecture.md) §5.3 for the full in-scope/out-of-scope validation matrix and the
+> correct status wording (*“the CIF v2 provider and mock media widget are available for workspace
+> integration validation”*).
 
 ---
 
