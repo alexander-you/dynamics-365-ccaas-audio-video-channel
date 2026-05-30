@@ -54,3 +54,22 @@ export async function issueRelayToken(): Promise<TokenResponse> {
     isMock: false
   };
 }
+
+// Routing plane: create a routed D365 Contact Center conversation so an agent receives a
+// work item. The relay POST /api/inbound is anonymous in the POC and maps avContext into the
+// Messaging API conversationcontext. Returns the conversation id (or a mock id in mock mode).
+export interface InboundResult {
+  accepted: boolean;
+  mode: string;
+  conversationId?: string;
+}
+
+export async function requestInbound(
+  customerName: string,
+  avContext: Record<string, string>
+): Promise<InboundResult> {
+  return postJson<{ customerName: string; avContext: Record<string, string> }, InboundResult>(
+    "/api/inbound",
+    { customerName, avContext }
+  );
+}

@@ -1,12 +1,14 @@
 // Customer entry-point flow: consent -> device check -> join -> in-call controls.
 // Phase 3 scaffold; C5 wires real ACS. In real mode (VITE_USE_MOCKS=false) the relay token
 // endpoint is used and the customer joins the same ACS group call as the agent.
-import { tokenService, issueRelayToken } from "./api";
+import { tokenService, issueRelayToken, requestInbound } from "./api";
 import { checkDevices } from "./media";
-import { createCallController, type CallController } from "./call";
+import { createCallController, readGroupId, type CallController } from "./call";
 import type { ConsentResult, EntryPoint } from "./types";
 
 const IS_REAL = (import.meta.env.VITE_USE_MOCKS ?? "true") === "false";
+const REQUESTED_MEDIA = "audio-video";
+const CUSTOMER_NAME = "Audio/Video web customer";
 
 const DISCLOSURE_TEXT =
   "This session may be recorded for quality and support purposes. By continuing, you consent " +
@@ -149,12 +151,36 @@ async function joinCall(): Promise<void> {
           channelConfig: CHANNEL_CONFIG
         });
 
+    // Routing plane: in real mode, create a routed D365 conversation so an agent receives a
+    // work item. The ACS group id is passed as context so the accepting agent can join the
+    // same call. A failure here must not block the media call (the call can still proceed).
+    let conversationNote = "";
+    if (IS_REAL) {
+      try {
+        const inbound = await requestInbound(CUSTOMER_NAME, {
+          mode: "live",
+          requestedMedia: REQUESTED_MEDIA,
+          acsGroupId: readGroupId(),
+          sessionRef: sessionId ?? "",
+          entryPoint: ENTRY_POINT,
+          source: "customer-web"
+        });
+        conversationNote = inbound.conversationId
+          ? ` Routed conversation ${inbound.conversationId} created for an agent.`
+          : "";
+      } catch (err) {
+        conversationNote =
+          " (Could not create the routed conversation; the call will still connect.)";
+        console.warn("inbound failed", err);
+      }
+    }
+
     controller = createCallController();
     await controller.join(token, $<HTMLVideoElement>("preview"));
 
     const status = controller.isMock
       ? "Connected (mock mode — local preview only, no remote agent)."
-      : "Connected to the ACS call. Waiting for the agent to join the same session…";
+      : `Connected to the ACS call. Waiting for the agent to join the same session…${conversationNote}`;
     $("call-status").textContent = status;
 
     // Reuse the preview element for the in-call video.
