@@ -127,3 +127,47 @@ video {
 .hidden {
   display: none;
 }
+
+.video-stage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.video-pane {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 200px;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.video-pane .remote,
+.video-pane .local {
+  width: 100%;
+  height: 100%;
+}
+
+.video-pane video {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+.video-label {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  z-index: 1;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+}

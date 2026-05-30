@@ -1,9 +1,12 @@
 // Customer entry-point flow: consent -> device check -> join -> in-call controls.
-// Phase 3 scaffold. Mock mode by default; no real ACS call is placed.
-import { tokenService } from "./api";
+// Phase 3 scaffold; C5 wires real ACS. In real mode (VITE_USE_MOCKS=false) the relay token
+// endpoint is used and the customer joins the same ACS group call as the agent.
+import { tokenService, issueRelayToken } from "./api";
 import { checkDevices } from "./media";
 import { createCallController, type CallController } from "./call";
 import type { ConsentResult, EntryPoint } from "./types";
+
+const IS_REAL = (import.meta.env.VITE_USE_MOCKS ?? "true") === "false";
 
 const DISCLOSURE_TEXT =
   "This session may be recorded for quality and support purposes. By continuing, you consent " +
@@ -58,6 +61,15 @@ function initConsent(): void {
     clearError();
     accept.disabled = true;
     try {
+      if (IS_REAL) {
+        // The POC relay only exposes /api/token. Session creation + consent persistence are
+        // mock-only POC features, so in real mode we acknowledge consent client-side and proceed.
+        sessionId = crypto.randomUUID();
+        await runDeviceCheck();
+        show("device");
+        return;
+      }
+
       // Create the session first so consent can be tied to it.
       const session = await tokenService.createSession({
         entryPoint: ENTRY_POINT,
@@ -129,18 +141,20 @@ async function joinCall(): Promise<void> {
     return;
   }
   try {
-    const token = await tokenService.issueToken({
-      anonymous: true,
-      entryPoint: ENTRY_POINT,
-      channelConfig: CHANNEL_CONFIG
-    });
+    const token = IS_REAL
+      ? await issueRelayToken()
+      : await tokenService.issueToken({
+          anonymous: true,
+          entryPoint: ENTRY_POINT,
+          channelConfig: CHANNEL_CONFIG
+        });
 
     controller = createCallController();
     await controller.join(token, $<HTMLVideoElement>("preview"));
 
     const status = controller.isMock
       ? "Connected (mock mode — local preview only, no remote agent)."
-      : "Connected.";
+      : "Connected to the ACS call. Waiting for the agent to join the same session…";
     $("call-status").textContent = status;
 
     // Reuse the preview element for the in-call video.
@@ -186,3 +200,8 @@ initConsent();
 initDeviceStep();
 initCallControls();
 show("consent");
+
+// Reflect the active mode in the header badge.
+($("phase-badge")).textContent = IS_REAL
+  ? "Live mode — real ACS call (joins the agent's group session)"
+  : "Phase 3 scaffold — mock mode (no real call is placed)";

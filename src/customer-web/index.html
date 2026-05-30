@@ -10,7 +10,7 @@
     <main class="app">
       <header>
         <h1>Connect with an agent</h1>
-        <p class="phase-badge">Phase 3 scaffold — mock mode (no real call is placed)</p>
+        <p id="phase-badge" class="phase-badge">Phase 3 scaffold — mock mode (no real call is placed)</p>
       </header>
 
       <!-- Step 1: consent -->
@@ -42,6 +42,16 @@
       <section id="call-step" class="card hidden">
         <h2>You are connected</h2>
         <p id="call-status" class="status"></p>
+        <div class="video-stage">
+          <div class="video-pane">
+            <span class="video-label">Agent</span>
+            <div id="remote-video" class="remote"></div>
+          </div>
+          <div class="video-pane">
+            <span class="video-label">You</span>
+            <div id="local-video" class="local"></div>
+          </div>
+        </div>
         <div class="actions">
           <button id="toggle-mic" class="secondary">Mute</button>
           <button id="toggle-cam" class="secondary">Stop video</button>
