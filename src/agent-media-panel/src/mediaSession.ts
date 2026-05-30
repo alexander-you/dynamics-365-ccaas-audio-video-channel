@@ -19,6 +19,8 @@ import type {
   PanelMessage,
   SessionState
 } from "./types";
+import type { AvContext } from "./context";
+import { readAvContext } from "./context";
 
 /** Events the session can emit to the UI. */
 export interface MediaSessionListener {
@@ -48,14 +50,19 @@ export interface IMediaSession {
 // -------------------------------------------------------------------------------------------------
 // MockMediaSession — fully local, no network, no ACS, no getUserMedia required.
 // -------------------------------------------------------------------------------------------------
-const MOCK_CASE: CaseContext = {
-  caseNumber: (import.meta.env.VITE_MOCK_CASE_NUMBER as string) ?? "CAS-01234-ABCDE",
-  caseTitle: "Sample support case (mock)",
-  contactName: (import.meta.env.VITE_MOCK_CONTACT_NAME as string) ?? "Sample Customer"
-};
+function caseFromContext(ctx: AvContext): CaseContext {
+  return {
+    caseNumber: ctx.caseNumber,
+    caseTitle: ctx.caseTitle,
+    contactName: ctx.contactName
+  };
+}
 
-function initialSnapshot(): SessionSnapshot {
-  const local: LocalMediaState = { micMuted: false, cameraOff: false, sharingScreen: false };
+function initialSnapshot(ctx: AvContext): SessionSnapshot {
+  // Audio-only requests start with the camera off so the agent's initial state matches the request.
+  const audioOnly = ctx.requestedMedia === "audio";
+  const local: LocalMediaState = { micMuted: false, cameraOff: audioOnly, sharingScreen: false };
+  const refNote = ctx.sessionRef ? ` (ref ${ctx.sessionRef})` : "";
   return {
     state: "idle",
     isMock: true,
@@ -63,18 +70,25 @@ function initialSnapshot(): SessionSnapshot {
     recording: "not-recording",
     consent: "unknown",
     participants: [],
-    caseContext: MOCK_CASE,
+    caseContext: caseFromContext(ctx),
+    mode: ctx.mode,
+    requestedMedia: ctx.requestedMedia,
+    sessionRef: ctx.sessionRef,
     message: {
       severity: "info",
-      text: "Mock mode — no real ACS call is placed. Use the controls to preview agent states."
+      text: `Mock mode — ${ctx.requestedMedia} interaction${refNote}. No real ACS call is placed.`
     }
   };
 }
 
 export class MockMediaSession implements IMediaSession {
   readonly isMock = true;
-  private snapshot: SessionSnapshot = initialSnapshot();
+  private snapshot: SessionSnapshot;
   private listeners = new Set<MediaSessionListener>();
+
+  constructor(ctx: AvContext = readAvContext()) {
+    this.snapshot = initialSnapshot(ctx);
+  }
 
   subscribe(listener: MediaSessionListener): () => void {
     this.listeners.add(listener);
@@ -108,11 +122,11 @@ export class MockMediaSession implements IMediaSession {
       },
       {
         id: "customer-1",
-        displayName: MOCK_CASE.contactName,
+        displayName: this.snapshot.caseContext.contactName,
         role: "customer",
         connection: "connected",
         micMuted: false,
-        cameraOn: true,
+        cameraOn: this.snapshot.requestedMedia === "audio-video",
         isSharingScreen: false
       }
     ];
@@ -235,7 +249,7 @@ export class RealMediaSession implements IMediaSession {
 }
 
 /** Factory honoring VITE_USE_MOCKS. Phase 3c always returns the mock unless explicitly disabled. */
-export function createMediaSession(): IMediaSession {
+export function createMediaSession(ctx: AvContext = readAvContext()): IMediaSession {
   const useMocks = (import.meta.env.VITE_USE_MOCKS as string | undefined) !== "false";
-  return useMocks ? new MockMediaSession() : new RealMediaSession();
+  return useMocks ? new MockMediaSession(ctx) : new RealMediaSession();
 }

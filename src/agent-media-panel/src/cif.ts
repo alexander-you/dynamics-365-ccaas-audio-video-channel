@@ -11,6 +11,8 @@
 // The CIF client library (`Microsoft.CIFramework`) is injected by the Dynamics host into the widget
 // iframe at runtime. We never bundle or fetch it ourselves.
 
+import type { AvContext, RequestedMedia } from "./context";
+
 /** Minimal shape of the CIF v2 client API we use. The host provides the real implementation. */
 interface CIFrameworkApi {
   // Raises an incoming notification in the workspace. Returns the user's action result as JSON.
@@ -28,6 +30,9 @@ interface CIFrameworkApi {
   // Presence (best-effort; availability depends on the workspace app).
   setPresence?(presenceInfo: string): Promise<string>;
   getPresence?(): Promise<string>;
+  // Returns environment/config for the widget, including any custom parameters the channel
+  // provider was configured with. Shape is host-defined; we parse defensively.
+  getEnvironment?(): Promise<string>;
   // Subscribes to CIF lifecycle events (e.g., "onpagenavigate").
   addHandler?(eventName: string, handler: (...args: unknown[]) => void): void;
 }
@@ -173,6 +178,47 @@ export class CifBridge {
       log("setPresence (cif) → ok", presence);
     } catch (err) {
       log("setPresence (cif) error", err);
+    }
+  }
+
+  /**
+   * Read A/V context overrides from the CIF environment (custom parameters the channel provider was
+   * configured with). Returns only the keys present; the caller merges these over the URL/defaults.
+   * Best-effort and mock-safe: returns {} in standalone mode or on any parse failure.
+   */
+  async getContextOverrides(): Promise<Partial<AvContext>> {
+    if (!this.api?.getEnvironment) {
+      log("getContextOverrides (unavailable) → {}");
+      return {};
+    }
+    try {
+      const envJson = await this.api.getEnvironment();
+      const env = safeParse(envJson) ?? {};
+      // Custom params may be nested under a few host-defined keys; check the common ones.
+      const raw =
+        (env["customParams"] as unknown) ??
+        (env["customparams"] as unknown) ??
+        (env["appConfigParams"] as unknown) ??
+        env;
+      const params =
+        typeof raw === "string" ? safeParse(raw) ?? {} : (raw as Record<string, unknown>);
+      const out: Partial<AvContext> = {};
+      const str = (v: unknown): string | undefined =>
+        typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
+      if (str(params["mode"])) out.mode = str(params["mode"]);
+      if (str(params["sessionRef"])) out.sessionRef = str(params["sessionRef"]);
+      if (str(params["caseNumber"])) out.caseNumber = str(params["caseNumber"]);
+      if (str(params["caseTitle"])) out.caseTitle = str(params["caseTitle"]);
+      if (str(params["contactName"])) out.contactName = str(params["contactName"]);
+      const media = str(params["requestedMedia"])?.toLowerCase();
+      if (media === "audio" || media === "audio-video") {
+        out.requestedMedia = media as RequestedMedia;
+      }
+      log("getContextOverrides (cif) → overrides", out);
+      return out;
+    } catch (err) {
+      log("getContextOverrides (cif) error", err);
+      return {};
     }
   }
 }

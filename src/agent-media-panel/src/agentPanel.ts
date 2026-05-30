@@ -48,6 +48,16 @@ export class AgentPanel {
 
       ${this.renderMessage(s)}
 
+      <section class="amp-context" aria-label="Interaction context">
+        <h2>Incoming A/V context</h2>
+        <dl>
+          <dt>Requested media</dt><dd>${esc(s.requestedMedia)}</dd>
+          <dt>Relay mode</dt><dd>${esc(s.mode)}</dd>
+          <dt>Session ref</dt><dd>${s.sessionRef ? esc(s.sessionRef) : "<span class=\"muted\">(none)</span>"}</dd>
+        </dl>
+        <p class="muted">Resolved from the routed conversation context (relay <code>conversationcontext</code>), via URL/CIF parameters. Display-only mock.</p>
+      </section>
+
       <section class="amp-case" aria-label="Related records">
         <h2>Related Case / Contact</h2>
         <dl>
