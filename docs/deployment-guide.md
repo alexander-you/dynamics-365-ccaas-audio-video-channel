@@ -129,6 +129,22 @@ services are wired and approved. Store credentials as **Key Vault references**, 
 
 > Host the built web bundle; point it at the token service base URL; serve over HTTPS.
 
+## 7a. Host the agent media panel
+
+The agent media panel (`src/agent-media-panel`) is embedded into the Dynamics 365 workspace as a
+CIF v2 widget and must be served over **HTTPS** from a **trusted/allow-listed origin**.
+
+- **POC (current):** built with `VITE_USE_MOCKS=true` and hosted on **GitHub Pages** at
+  `https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/` via
+  `.github/workflows/deploy-agent-media-panel.yml`. This is **temporary POC hosting only.**
+- **Production (target):** host the production bundle on **Azure** — preferably **Azure Static Web
+  Apps**, otherwise **Azure App Service** or **Azure Storage static website** — chosen per final
+  requirements (custom domain, network controls, identity, governance). GitHub Pages **must not** be
+  used as the production hosting model.
+- On moving to Azure, update the CIF v2 Channel Provider **Channel URL** and **Trusted domain** to
+  the Azure origin. See [architecture.md](architecture.md) §5.2 and
+  [cif-v2-configuration.md](cif-v2-configuration.md) §2.
+
 ## 8. Import the Power Platform solution (Phase 5/6)
 
 > **Requires confirmed environment, solution, publisher, and `alex` prefix.**

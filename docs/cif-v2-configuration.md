@@ -45,10 +45,17 @@ Framework** app / `msdyn_*` provider tables) with these proposed values:
 
 - **POC:** host the existing `src/agent-media-panel` build (`VITE_USE_MOCKS=true`) at a stable HTTPS
   URL and point the Channel Provider at it. The widget loads inside the CIF panel `iframe`.
+  The POC host is **GitHub Pages** (`https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/`).
 - The widget uses the **CIF v2 client API** (`Microsoft.CIFramework.*`) for workspace actions
   (notifications, sessions, screen-pop, presence) and its own `IMediaSession` (mock) for media.
 - **Later (real ACS):** the same URL serves the production bundle with `RealMediaSession`; the origin
   must be allow-listed and the embedding `iframe` must carry the media `allow` policy.
+
+> **Hosting note — GitHub Pages is temporary POC hosting only.** It is **not** the target production
+> hosting model. Production hosting of the panel must be **Azure-based** — preferably **Azure Static
+> Web Apps**, otherwise **Azure App Service** or **Azure Storage static website** — per final
+> requirements. When that move happens, update the Channel Provider **Channel URL** and **Trusted
+> domain** to the Azure origin. See [architecture.md](architecture.md) §5.2.
 
 > **No secrets in the URL or custom parameters.** Tokens (later) are fetched at runtime from the token
 > service, never embedded in CIF configuration.
