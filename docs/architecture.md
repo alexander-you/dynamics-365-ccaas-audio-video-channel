@@ -151,6 +151,39 @@ abstraction boundary (`IMediaSession`) between the UI and the future ACS Calling
 
 See [known-limitations.md](known-limitations.md) for the full native-vs-custom matrix.
 
+### 5.3 What “provider surfacing” validates — and what it does **not**
+
+> **CIF v2 provider/widget surfacing is not the same as a native routed Dynamics 365 conversation.**
+> Attaching a CIF v2 Channel Provider to an app profile only makes the custom widget **available to
+> load** in the workspace for users on that profile. It does **not** create a workstream, queue,
+> routing rule, Dataverse session schema, or a real work item, and it does **not** produce a native
+> inbox conversation, chat/voice transcript, capacity consumption, or customer-summary population.
+
+At the current stage (CIF provider attached to a profile + test user on that profile + mock panel on
+the POC host), the **only** validatable behaviors are:
+
+| # | In scope to validate now | Notes |
+|---|---|---|
+| 1 | CIF v2 provider is attached to the selected app profile | Dataverse N:N association |
+| 2 | The approved test user receives that app profile | one app profile per user |
+| 3 | The custom **Audio/Video (POC)** widget can load in the workspace side pane / communication area | iframe surfacing |
+| 4 | The GitHub Pages mock panel embeds successfully | HTTPS, no frame-deny headers |
+| 5 | The panel can detect `Microsoft.CIFramework` when loaded inside the workspace | else standalone fallback |
+| 6 | The mock UI runs in standalone/mock mode | `VITE_USE_MOCKS=true` |
+| 7 | A “simulate incoming interaction” action *may* call CIF APIs (`notifyEvent`/`createSession`) | **simulation only**, not a routed conversation |
+
+**Explicitly out of scope at this stage:** real inbox conversation, native Omnichannel work item,
+native chat/voice transcript, native routing, queue assignment, capacity consumption, native customer
+summary from a real conversation, and any real ACS call or recording.
+
+> **Correct status wording:** *“The CIF v2 provider and mock media widget are available for workspace
+> integration validation.”* Not *“a working custom channel.”*
+
+The next real milestone is one of: **(A)** a controlled mock/simulated CIF interaction flow
+(notification → accept/reject → session open); **(B)** a record-based workstream using an Audio/Video
+Session Dataverse record; or **(C)** a Custom Messaging / BYOC bootstrap that creates a routed work
+item and then launches the ACS media session.
+
 ---
 
 ## 6. Data & orchestration
