@@ -170,7 +170,7 @@ flowchart LR
 | **C1a** | Create POC **messaging workstream** (record), POC **queue**, **routing rule**, **capacity profile**; bind to the channel | Mostly yes (Dataverse records) | ✅ done |
 | **C2** | **Scripted inbound**: call the inbound messaging API with a mock A/V context to create a routed conversation | Yes (once C1a exists) | ✅ done |
 | **C3** | On accept, panel reads conversation context and launches the **mock** media session; validate end-to-end | Yes | ✅ done |
-| **C5** | Swap `MockMediaSession` → `RealMediaSession` (real ACS + token service) | Azure/ACS provisioning | **separate approval — not started** |
+| **C5** | Swap `MockMediaSession` → `RealMediaSession` (real ACS + token service) | Azure/ACS provisioning | **done (2026-05-30, PR #19)** — see §6.10 |
 
 ### 6.4 Open decision (blocks C1b/C2)
 
@@ -314,11 +314,35 @@ mock media launch from it (instead of build-time mock defaults). The context key
 
 **Rollback (C3):** revert PR #17 (code-only, no infra). Reversible.
 
-### 6.10 C5 (not started): real ACS media — **awaiting separate approval**
+### 6.10 C5 done (2026-05-30): real ACS media
 
-C5 is the only remaining gate. It swaps `MockMediaSession` → `RealMediaSession` and wires the real ACS
-token service + media SDK. It provisions/uses **real ACS resources, real tokens, and live media**, so it is
-held behind an **explicit, separate approval** and has **not** been started. Planned execution order once
-approved: provision ACS in `rg-acv-byoc-poc` → stand up the token endpoint (managed identity, Key Vault) →
-implement `RealMediaSession` against the existing `MediaSession` interface → validate audio-only then
-audio-video against a live conversation → keep `RELAY_MODE` controls for instant rollback to mock.
+C5 swapped `MockMediaSession` → `RealMediaSession` and wired real Azure Communication Services media. It
+was executed only after **explicit, separate approval** ("real ACS media is approved").
+
+**What was provisioned/changed:**
+
+- **ACS resource** `acs-acv-byoc-poc` (RG `rg-acv-byoc-poc`, dataLocation Europe, endpoint
+  `https://acs-acv-byoc-poc.europe.communication.azure.com`, immutableId `daeb3a87-0ed7-40b4-b1fe-277bd05b3cfd`).
+  The connection string is stored as KV secret `acs-connection-string` in `kv-acvbyoc-mb9cs2`.
+- **Token endpoint on the relay** (reused `func-acv-byoc-relay-vnusoc` rather than a separate service):
+  `POST /api/token` (`authLevel: anonymous`) issues ACS **VoIP** tokens via `CommunicationIdentityClient`,
+  reading `ACS_CONNECTION_STRING` from a **Key Vault reference** app setting resolved by the user-assigned
+  managed identity `id-acv-byoc-poc`. App settings `ACS_ENDPOINT` + `ACS_CONNECTION_STRING` set; CORS allows
+  `https://alexander-you.github.io` and `http://localhost:5190`. Verified live (real 24h ACS JWT issued).
+- **Panel `RealMediaSession`** (`src/agent-media-panel/src/mediaSession.ts`): uses
+  `@azure/communication-calling` to fetch a token from the relay, build an
+  `AzureCommunicationTokenCredential`, create a `CallAgent`, and **join an ACS group call** (group GUID from
+  `VITE_ACS_GROUP_ID`). Drives mic mute, camera on/off, screen share, the remote roster, and live video
+  tiles via `VideoStreamRenderer`. The panel renders a Video stage and calls `attachVideo()` after each
+  re-render so views survive the panel's `innerHTML` refresh.
+- **Config / safety:** real ACS is gated by `VITE_USE_MOCKS=false` (default is mock). The public GitHub
+  Pages deploy stays **`VITE_USE_MOCKS=true`** — the token endpoint is anonymous, so real ACS is enabled only
+  via a deliberate local/explicit build. Instant rollback: set `VITE_USE_MOCKS` back to `true` (or revert
+  PR #19); ACS consumption is ~0 if no calls are placed.
+
+**Validation:** token endpoint returned a real ACS token; panel built (tsc + vite) and was driven in-browser
+to **Connected** on a real ACS group call with live controls and the agent in the roster. In the headless
+integrated browser the call drops shortly after connecting because there is no microphone/camera hardware
+(an environment limitation, not a code defect); on a real agent desktop with devices the call persists.
+Full two-party media additionally requires a second participant (customer) entry point, which is out of
+scope for C5.
