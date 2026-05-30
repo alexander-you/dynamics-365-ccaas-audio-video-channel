@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 2 planning (documentation only)
+- `docs/azure-resources.md`: proposed Azure resource plan covering resource group, region guidance,
+  ACS / Function App / storage (functions + recordings BYOS) / blob container / Event Grid /
+  Application Insights / Log Analytics / Key Vault, Managed Identity + RBAC model, naming
+  convention, environment variables, deployment sequence, cost considerations, Microsoft validation
+  items, and an explicit pre-provisioning approval gate.
+- Proposed concrete resource names and the Phase 2 decision checklist recorded in
+  `docs/private/environments.md` (git-ignored).
+- Updated `docs/implementation-plan.md`: Phase 2 marked as planning-done / awaiting provisioning approval.
+
+### Notes
+- **No Azure resources were created, modified, or deleted.** Provisioning is gated on explicit user
+  approval of subscription, resource group, region, naming convention, and cost impact.
+
 ### Planned
-- Phase 2: Azure resource plan (documentation only, no provisioning).
 - Phase 3: ACS token service + customer web entry point.
 
 ## [0.1.0] — 2026-05-30
