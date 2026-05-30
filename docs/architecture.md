@@ -134,6 +134,21 @@ abstraction boundary (`IMediaSession`) between the UI and the future ACS Calling
 - Browser/iframe Permissions-Policy for camera/mic/screen-share in the D365 host is an open
   validation item — see [known-limitations.md](known-limitations.md).
 
+### 5.2 Panel hosting model (POC vs. production)
+
+| Aspect | POC (current) | Target (production) |
+|---|---|---|
+| Host | **GitHub Pages** — `https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/` | **Azure-based** static hosting |
+| Status | **Temporary POC hosting only** | **Intended production model** |
+| Build | `VITE_USE_MOCKS=true` (mock media, no ACS/Dataverse calls) | Production bundle with `RealMediaSession` |
+| Options | — | **Azure Static Web Apps** (preferred), **Azure App Service**, or **Azure Storage static website** — chosen per final requirements |
+
+> **GitHub Pages is approved only as temporary POC hosting and must not be positioned as the target
+> production hosting model.** Production hosting of the agent media panel should be **Azure-based**
+> (preferably **Azure Static Web Apps**, otherwise **Azure App Service** or **Azure Storage static
+> website**), aligned with the rest of the Azure footprint (ACS, Functions, storage) for identity,
+> network controls, custom domain, and governance.
+
 See [known-limitations.md](known-limitations.md) for the full native-vs-custom matrix.
 
 ---
