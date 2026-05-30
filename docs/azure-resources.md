@@ -101,10 +101,14 @@ Names below use the **naming convention** in §11 with placeholder tokens (`<env
 
 ### 6.2 Recordings storage (BYOS)
 - **Proposed name:** `stacvrec<env><region><nn>` → e.g., `stacvrecdevweu01`
+- **Part of the MVP from day one.** The physical audio/video recording **file** is stored here
+  (Bring-Your-Own-Storage); Dataverse stores only the **metadata + secure reference**. See
+  [configuration-model.md](configuration-model.md) §0 and [adr/0006-storage-responsibility-split.md](adr/0006-storage-responsibility-split.md).
 - **Redundancy:** ZRS or GRS for production durability; LRS acceptable for dev. **[Assumption]**
 - **Blob container:** `recordings` (private; no public access).
-- **Policies:** lifecycle management for retention (`alex_retentiondays`); **immutable (WORM)**
-  policy where regulatory retention is required.
+- **MVP scope:** private container + Managed-Identity write is sufficient for the MVP.
+- **Production hardening (later phases):** lifecycle rules (`alex_retentiondays`), retention policies,
+  **immutability/WORM** where required, scoped RBAC, access auditing, and cost controls.
 - **Access:** Function writes via Managed Identity; retrieval via scoped, time-limited SAS or RBAC.
 - **Encryption:** AES-256 at rest; optional **Customer-Managed Keys** via Key Vault.
 

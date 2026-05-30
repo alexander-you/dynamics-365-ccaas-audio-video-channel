@@ -11,6 +11,36 @@ This model has two parts:
 
 ---
 
+## 0. Storage responsibility (MVP system-of-record split)
+
+> This is a load-bearing architecture decision. See [adr/0006-storage-responsibility-split.md](adr/0006-storage-responsibility-split.md).
+
+| Data | System of record (MVP) | Notes |
+|---|---|---|
+| A/V **session metadata** | **Dataverse** | `alex_acvsession` |
+| **Consent records** | **Dataverse** | `alex_acvconsent` — compliance evidence |
+| **Recording metadata** + secure reference to the file | **Dataverse** | `alex_acvrecording` (stores the **Blob reference**, not the bytes) |
+| **Transcript** + **AI summary** | **Dataverse** | `alex_acvtranscript` |
+| **Events / telemetry metadata** | **Dataverse** | `alex_acvevent` (operational firehose may also go to App Insights) |
+| Case / contact / account **linkage** | **Dataverse** | Standard lookups + `phonecall` timeline |
+| Agent, queue, status, **lifecycle** | **Dataverse** | On `alex_acvsession` |
+| **Physical audio/video recording file (bytes)** | **Azure Blob Storage (BYOS)** | From **day one** of the MVP |
+
+**Rules:**
+- **Dataverse is the system of record for business and compliance data.** It stores the records and
+  metadata above, including a **secure reference** (Blob URI + credential reference) to the media file.
+- **The physical media file lives in Azure Blob Storage (BYOS) from the MVP onward.** It is **not**
+  stored in Dataverse by default.
+- The recording table (`alex_acvrecording`) holds **metadata + a secure reference** to the Blob file
+  — never the file bytes.
+- `recordingStorageMode` (`alex_recordingstoragemode`) MVP default = **`AzureBlobBYOS`**.
+- **`DataverseFile` is demo-only / experimental** for *very small* recordings — **not recommended for
+  MVP or production**. See §6.
+- Later production phases harden Blob storage: lifecycle rules, retention, immutability/WORM (if
+  required), RBAC, auditing, and cost controls. See [azure-resources.md](azure-resources.md) §6.2.
+
+---
+
 ## 1. Channel configuration table — `alex_acvchannelconfig`
 
 **Display name:** ACS A/V Channel Configuration
@@ -38,7 +68,7 @@ queue → business unit**.
 | `alex_enableaisummary` | Enable AI summary | Boolean | No | Requires transcription |
 | `alex_consenttemplate` | Consent message template | Multiline | — | Disclosure text |
 | `alex_requireconsent` | Require consent | Boolean | Yes | Block join until consent captured |
-| `alex_storagemode` | Storage mode | Choice | BYOS | BYOS · ACSDefault(24h) |
+| `alex_recordingstoragemode` | Recording storage mode | Choice | **AzureBlobBYOS** | **AzureBlobBYOS (MVP default)** · ACSDefault24h (temp) · DataverseFile (demo-only/experimental — see §6) |
 | `alex_storagecontainerurl` | Storage container URL | Text(500) | — | Blob container base URL (BYOS) |
 | `alex_storagesasreference` | Storage credential reference | Text(200) | — | Key Vault secret **name** — **never the SAS itself** |
 | `alex_retentiondays` | Retention period (days) | Integer | 365 | Blob lifecycle |
@@ -80,13 +110,18 @@ queue → business unit**.
 | `alex_anonymous` | Boolean | Identity model |
 
 ### 2.2 `alex_acvrecording` — Audio/Video Recording
+> Stores **recording metadata + a secure reference** to the media file in Azure Blob (BYOS).
+> **Never stores the file bytes** in the MVP/production default.
+
 | Field | Type | Purpose |
 |---|---|---|
 | `alex_recordingid` | Text | ACS recording id |
 | `alex_sessionid` | Lookup → `alex_acvsession` | Parent |
 | `alex_format` | Choice (mp4/mp3/wav) | Media format |
 | `alex_mode` | Choice (Mixed/Unmixed) | Recording mode |
-| `alex_bloburi` | Text | Storage location (BYOS) |
+| `alex_storagemode` | Choice (AzureBlobBYOS/ACSDefault24h/DataverseFile) | Where the file lives (MVP: AzureBlobBYOS) |
+| `alex_bloburi` | Text(500) | **Secure reference** to the media file in Blob (BYOS) |
+| `alex_blobcredentialref` | Text(200) | Key Vault secret **name** / MI scope for retrieval — never a literal SAS |
 | `alex_status` | Choice (Recording/Available/Failed/Deleted) | State |
 | `alex_retentionuntil` | DateTime | Lifecycle/WORM |
 | `alex_consentverified` | Boolean | Compliance gate |
@@ -156,3 +191,21 @@ queue → business unit**.
 Expose `alex_acvchannelconfig` (and the metadata tables, read-only for ops) as a **custom
 model-driven app** or a tab in the existing Contact Center admin app. Admins use forms — no code,
 no JSON. **[Assumption]**
+
+---
+
+## 6. `recordingStorageMode` options
+
+| Mode | MVP/Prod recommendation | Where the file lives | When to use |
+|---|---|---|---|
+| **`AzureBlobBYOS`** | ✅ **MVP & production default** | Organization-owned Azure Blob container | Always, by default. Durable, controllable, retention/WORM-capable, cost-efficient for video. |
+| `ACSDefault24h` | ⚠️ Not for production | ACS temporary storage (**24h** only) | Throwaway testing only; files auto-expire. |
+| `DataverseFile` | 🧪 **Demo-only / experimental — NOT recommended** | Dataverse File column | Tiny audio-only clips in a demo where no Blob exists. Subject to Dataverse file-size/storage-cost limits; do not use for video or production. |
+
+**Why Blob, not Dataverse File, for media:**
+- Video recordings are large; Dataverse file storage is costly and size-limited.
+- Blob supports lifecycle, immutability/WORM, and granular RBAC needed for compliance.
+- The split keeps Dataverse as the lightweight **system of record** for metadata while Blob holds bytes.
+
+Regardless of mode, **`alex_acvrecording` always stores the metadata + secure reference**; only the
+*physical bytes location* changes. The MVP never stores video bytes in Dataverse.
