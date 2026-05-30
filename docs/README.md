@@ -21,6 +21,11 @@ Generic, shareable, and safe for the public remote.
 | [business-overview.md](business-overview.md) | Business goal, use cases, user roles, expected value. |
 | [implementation-plan.md](implementation-plan.md) | Phased plan, current phase, completed work, open tasks, risks. |
 | [configuration-model.md](configuration-model.md) | Dataverse configuration & metadata model design. |
+| [channel-configuration-model.md](channel-configuration-model.md) | Admin-facing channel configuration surface (Phase 4A planning). |
+| [d365-agent-workspace-integration.md](d365-agent-workspace-integration.md) | Plan: integrating the mock agent media panel into the D365 workspace (Phase 4A). |
+| [cif-v2-configuration.md](cif-v2-configuration.md) | Plan: CIF v2 Channel Provider, notifications, sessions, screen-pop, presence (Phase 4A). |
+| [d365-workstream-and-channel-strategy.md](d365-workstream-and-channel-strategy.md) | Plan: how the custom A/V channel relates to workstreams, routing, capacity (Phase 4A). |
+| [d365-pre-change-checklist.md](d365-pre-change-checklist.md) | Pre-change approval checklist of every D365/Power Platform component (Phase 4A). |
 | [azure-resources.md](azure-resources.md) | Proposed Azure resource plan (plan only — no provisioning). |
 | [deployment-experience.md](deployment-experience.md) | End-user/admin deployment concept: HTML Deployment Assistant, managed/unmanaged solutions, approval gates, MVP vs production hardening. |
 | [deployment-guide.md](deployment-guide.md) | How an administrator deploys the solution in their own tenant. |
