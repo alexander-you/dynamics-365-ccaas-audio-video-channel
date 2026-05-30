@@ -207,6 +207,7 @@ export class CifBridge {
         typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
       if (str(params["mode"])) out.mode = str(params["mode"]);
       if (str(params["sessionRef"])) out.sessionRef = str(params["sessionRef"]);
+      if (str(params["acsGroupId"])) out.acsGroupId = str(params["acsGroupId"]);
       if (str(params["caseNumber"])) out.caseNumber = str(params["caseNumber"]);
       if (str(params["caseTitle"])) out.caseTitle = str(params["caseTitle"]);
       if (str(params["contactName"])) out.contactName = str(params["contactName"]);

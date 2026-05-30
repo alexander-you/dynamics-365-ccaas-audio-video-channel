@@ -24,6 +24,8 @@ export interface AvContext {
   requestedMedia: RequestedMedia;
   /** Correlation reference from the relay (conversationrequestid / sessionRef). */
   sessionRef: string;
+  /** ACS group-call GUID to join. The customer entry point joins the same group. Empty = use build default. */
+  acsGroupId: string;
   caseNumber: string;
   caseTitle: string;
   contactName: string;
@@ -33,6 +35,7 @@ const DEFAULTS: AvContext = {
   mode: "mock",
   requestedMedia: "audio-video",
   sessionRef: "",
+  acsGroupId: "",
   caseNumber: "CAS-01234-ABCDE",
   caseTitle: "Sample support case (mock)",
   contactName: "Sample Customer"
@@ -71,6 +74,7 @@ export function parseAvContext(search: string): AvContext {
     requestedMedia:
       coerceMedia(get("requestedMedia")) ?? DEFAULTS.requestedMedia,
     sessionRef: get("sessionRef") ?? DEFAULTS.sessionRef,
+    acsGroupId: get("acsGroupId") ?? DEFAULTS.acsGroupId,
     caseNumber: get("caseNumber") ?? env.caseNumber ?? DEFAULTS.caseNumber,
     caseTitle: get("caseTitle") ?? DEFAULTS.caseTitle,
     contactName: get("contactName") ?? env.contactName ?? DEFAULTS.contactName
