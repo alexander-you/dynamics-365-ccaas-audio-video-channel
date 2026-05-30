@@ -9,6 +9,28 @@ The channel is configured through a custom **ACS A/V Channel Configuration** rec
 (`alex_acvchannelconfig`) in Dataverse, plus standard Unified Routing configuration. See
 [configuration-model.md](configuration-model.md) for the full field reference.
 
+## 1a. The admin setup experience (preview)
+
+Before the Dataverse configuration above is relevant, an administrator first sets up the Azure
+side. That experience is being designed up front (see [deployment-experience.md](deployment-experience.md))
+so it is friendly to administrators, not only developers.
+
+- **Deployment Assistant (HTML wizard).** A local, static page (`src/deployment-assistant/`) that
+  walks you through subscription/region/resource-group/naming choices and generates a **deployment
+  plan preview**: which Azure resources will be created, proposed names, **cost impact**, required
+  **permissions**, the **Managed Identity / RBAC** model, an **app-settings template**, example Bicep
+  parameters, manual Portal steps, and explicit **approval gates**. In this phase it is a *preview*:
+  it deploys nothing and calls no APIs, and it **never stores secrets**.
+- **Power Platform solutions (later).** You will import an **unmanaged** solution into a dev
+  environment for customization, and a **managed** solution into test/prod. These carry the Dataverse
+  schema, the CIF v2 channel provider, and app configuration.
+- **What you confirm as admin:** subscription/RG/region, naming/prefix, cost acceptance, RBAC
+  assignments, recording storage mode + retention, and (later) the Dynamics environment, publisher,
+  and `alex` prefix.
+
+> This section will expand with screenshots and step-by-step procedures as the real (non-preview)
+> deployment path is implemented.
+
 ## 2. Configuration scope
 
 A configuration record can be scoped to (most specific wins): **channel instance → workstream →

@@ -1,9 +1,16 @@
-# Deployment Guide
+# Deployment Guide (Administrator)
 
-> **Version:** 0.1.0 · **Status:** Skeleton — fills in as components are built (Phases 2–12).
-> Goal: a new person can deploy the solution from scratch using only this guide.
+> **Version:** 0.1.0 · **Status:** Living document — expands as components land (Phases 2–12).
+> **Audience:** the administrator deploying this solution into **their own Azure subscription and
+> Dynamics 365 environment**. You do not need to be the original author.
+>
+> **Current state:** the solution is in scaffold/preview. The token service and clients run in
+> **mock mode**; no Azure resources are required yet. Use the **Deployment Assistant** to plan the
+> real deployment. **Nothing in this guide provisions resources automatically.**
 
-## 0. Prerequisites
+## 0. Before you start
+
+### 0.1 Tools
 
 | Tool | Min version | Check |
 |---|---|---|
@@ -14,8 +21,22 @@
 | Azure CLI | 2.5+ | `az version` |
 | Power Platform CLI | 1.30+ | `pac help` |
 
-Access required: Azure subscription (Contributor on target RG), Dynamics 365 environment
-(System Customizer/Admin), GitHub repo write. See [access-readiness-checklist.md](access-readiness-checklist.md).
+### 0.2 Access you will need
+
+| Task | Role |
+|---|---|
+| Create Azure resources | **Contributor** on the target resource group |
+| Assign RBAC / Managed Identity | **Owner** or **User Access Administrator** |
+| Import the Power Platform solution | **System Customizer / System Administrator** in Dynamics 365 |
+| Push to the repo (optional) | GitHub write access |
+
+See [access-readiness-checklist.md](access-readiness-checklist.md).
+
+### 0.3 Golden rules
+
+- **Never** commit secrets, connection strings, tokens, tenant IDs, or environment URLs.
+- Each component ships a `*.example` config. Copy it locally and fill from **Key Vault** references.
+- Approve cost, naming, and RBAC **before** provisioning. See [deployment-experience.md](deployment-experience.md).
 
 ## 1. Clone the repository
 
@@ -24,31 +45,75 @@ git clone https://github.com/alexander-you/dynamics-365-ccaas-audio-video-channe
 cd dynamics-365-ccaas-audio-video-channel
 ```
 
-## 2. Azure resources (Phase 2 — TBD)
+## 2. Plan the deployment with the Deployment Assistant
 
-> To be filled in once `docs/azure-resources.md` is authored and resources approved.
-Planned: resource group, ACS resource, Function App, Storage account + container, Event Grid
-subscription, Application Insights, Key Vault, Managed Identity, RBAC assignments.
+The Deployment Assistant is a **local, static** wizard that helps you choose your subscription,
+region, resource group, and naming, then generates a **deployment plan preview** (resources, cost,
+RBAC, app-settings template, example Bicep parameters, and approval gates). It does **not** deploy
+anything or call any API.
 
-## 3. Configuration (no secrets in repo)
+```powershell
+cd src/deployment-assistant
+Copy-Item .env.example .env.local   # cosmetic defaults only — no secrets
+npm install
+npm run dev                         # open http://localhost:5180
+```
 
-> Each component will ship a `*.settings.example` / `.env.example`. Copy locally and fill from
-> Key Vault references. Never commit real values.
+Work through the wizard, then **Export plan (.txt)** and review it with your Azure administrator.
+See [src/deployment-assistant/README.md](../src/deployment-assistant/README.md).
 
-## 4. Token service deployment (Phase 3 — TBD)
+## 3. Try the solution locally (mock mode — no Azure needed)
 
-## 5. Customer entry point deployment (Phase 3 — TBD)
+You can exercise the end-to-end flow before provisioning anything.
 
-## 6. Orchestration Functions + Event Grid (Phase 4/8 — TBD)
+```powershell
+# Terminal 1 — token service (mocks)
+cd src/token-service
+Copy-Item local.settings.json.example local.settings.json
+func start
 
-## 7. Dynamics 365 solution import (Phase 5/6 — TBD)
+# Terminal 2 — customer web entry point (mock call)
+cd src/customer-web
+Copy-Item .env.example .env.local
+npm install
+npm run dev      # http://localhost:5173
+```
 
-> Import the Power Platform solution; configure CIF v2 channel provider; bind the agent app profile.
-> **Requires user-confirmed environment, solution, publisher, and prefix.**
+Responses include `"isMock": true`; no real ACS call is placed.
 
-## 8. PCF / web component deployment (Phase 7 — TBD)
+## 4. Provision Azure resources (when approved)
 
-## 9. Routing configuration (Phase 9 — TBD)
+> **Gate:** subscription, RG, region, naming, cost, and RBAC must be approved first.
+
+Follow the resource plan in [azure-resources.md](azure-resources.md) and the Deployment Assistant
+output. Resources: resource group, ACS, Function App, Functions runtime storage, recordings Blob
+(BYOS), Event Grid, Application Insights, Log Analytics, and (optionally) Key Vault. Provision via
+the Azure Portal (manual steps are listed per resource in the assistant) or via Infrastructure-as-Code
+(later phase). Assign the Function App's Managed Identity the roles shown in the RBAC model.
+
+## 5. Configure app settings (no secrets in source control)
+
+Use the app-settings template from the Deployment Assistant. Set `USE_MOCKS=false` only once real
+services are wired and approved. Store credentials as **Key Vault references**, never inline.
+
+## 6. Deploy the token service + orchestration Functions (Phase 3b/4/8)
+
+> To be detailed as the real (non-mock) implementations land. Publish the .NET 8 isolated Function
+> App; bind Application Insights; configure the Event Grid subscription to the orchestration endpoint.
+
+## 7. Deploy the customer entry point (Phase 7)
+
+> Host the built web bundle; point it at the token service base URL; serve over HTTPS.
+
+## 8. Import the Power Platform solution (Phase 5/6)
+
+> **Requires confirmed environment, solution, publisher, and `alex` prefix.**
+> Import the **unmanaged** solution in a dev environment for customization, and the **managed**
+> solution into test/prod. Configure the CIF v2 channel provider and bind the agent app profile.
+
+## 9. Routing configuration (Phase 9)
+
+> Configure the Unified Routing workstream/queue/skills per [admin-guide.md](admin-guide.md).
 
 ## 10. Smoke test
 
@@ -56,8 +121,8 @@ subscription, Application Insights, Key Vault, Managed Identity, RBAC assignment
 
 ## 11. Rollback
 
-> Per-component rollback steps (solution version revert, Function App slot swap, resource
-> teardown) to be documented as components land.
+> Per-component rollback (solution version revert, Function App slot swap, resource teardown) to be
+> documented as components land. For a planning-only/preview deployment there is nothing to roll back.
 
 ## Environment variable / setting reference
 

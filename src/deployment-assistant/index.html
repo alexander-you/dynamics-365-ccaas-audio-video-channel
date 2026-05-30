@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ACV Deployment Assistant (Preview)</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <!-- Welcome & overview -->
+      <header>
+        <h1>Audio &amp; Video Channel — Deployment Assistant</h1>
+        <p class="phase-badge">Phase 3.5 prototype — local only · no Azure or Dynamics calls · nothing is deployed</p>
+      </header>
+
+      <section class="card intro">
+        <h2>Welcome</h2>
+        <p>
+          This assistant helps an administrator plan the Azure resources and configuration needed to
+          deploy the custom Audio &amp; Video channel for Dynamics 365 Contact Center. In this preview
+          it <strong>collects your inputs and generates a deployment plan locally</strong>. It does not
+          create, modify, or delete anything, and it does not contact Azure or Dynamics 365.
+        </p>
+        <div class="callout danger">
+          🔒 <strong>Do not paste secrets.</strong> Never enter connection strings, access keys, SAS
+          tokens, or passwords here. Secrets belong in Azure Key Vault, not in this page.
+        </div>
+        <div class="callout">
+          🧪 <strong>MVP vs production hardening.</strong> This plan targets a working MVP. Production
+          hardening (private endpoints, customer-managed keys, multi-region DR, lifecycle policies) is
+          called out separately in the documentation and is not part of this preview.
+        </div>
+      </section>
+
+      <!-- Azure prerequisites -->
+      <section class="card">
+        <h2>Azure prerequisites</h2>
+        <ul>
+          <li>An Azure subscription you are allowed to deploy into.</li>
+          <li><strong>Contributor</strong> on the target resource group (to create resources).</li>
+          <li><strong>Owner</strong> or <strong>User Access Administrator</strong> to assign RBAC roles / Managed Identity.</li>
+          <li>Azure CLI and/or access to the Azure Portal.</li>
+          <li>Region availability for ACS Call Recording / transcription (validate with Microsoft).</li>
+        </ul>
+      </section>
+
+      <!-- Required permissions -->
+      <section class="card">
+        <h2>Required permissions (summary)</h2>
+        <ul>
+          <li>Create resources → <em>Contributor</em>.</li>
+          <li>Assign roles to the Function App identity → <em>Owner / User Access Administrator</em>.</li>
+          <li>Import Power Platform solution → <em>Dynamics 365 System Customizer / Admin</em> (later phase).</li>
+        </ul>
+      </section>
+
+      <!-- Inputs: naming, region, resource group -->
+      <section class="card">
+        <h2>Deployment inputs</h2>
+
+        <div class="field">
+          <label for="subscriptionLabel">Subscription label (your reference)</label>
+          <input id="subscriptionLabel" type="text" placeholder="e.g., Contoso Dev" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="subscriptionId">Subscription ID (optional now)</label>
+          <input id="subscriptionId" type="text" placeholder="GUID — or leave blank to fill in later" autocomplete="off" />
+          <p id="warn-subscriptionId" class="inline-warn hidden"></p>
+          <small class="muted">Treated as a non-secret identifier. Leave blank if you prefer not to record it here.</small>
+        </div>
+
+        <div class="field">
+          <label for="region">Target region</label>
+          <select id="region"></select>
+        </div>
+
+        <div class="field">
+          <label for="resourceGroup">Resource group name</label>
+          <input id="resourceGroup" type="text" placeholder="e.g., rg-acv-dev-weu" autocomplete="off" />
+          <label class="checkbox"><input id="createResourceGroup" type="checkbox" /> Create this resource group (uncheck if it already exists)</label>
+        </div>
+
+        <div class="field">
+          <label for="prefix">Workload / naming prefix</label>
+          <input id="prefix" type="text" placeholder="acv" autocomplete="off" />
+          <small class="muted">Used in the naming convention <code>&lt;type&gt;-&lt;prefix&gt;-&lt;env&gt;-&lt;region&gt;</code>.</small>
+        </div>
+
+        <div class="field">
+          <label for="environment">Environment</label>
+          <select id="environment">
+            <option value="dev">dev</option>
+            <option value="test">test</option>
+            <option value="prod">prod</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="checkbox"><input id="enableRecordingByos" type="checkbox" /> Provision Blob Storage for recordings (BYOS) — MVP default</label>
+          <label class="checkbox"><input id="useKeyVault" type="checkbox" /> Use Key Vault for secret references (recommended)</label>
+        </div>
+
+        <ul id="errors" class="errors hidden"></ul>
+
+        <div class="actions">
+          <button id="generate">Generate deployment plan preview</button>
+          <button id="export-plan" class="secondary hidden">Export plan (.txt)</button>
+        </div>
+      </section>
+
+      <!-- Generated plan: resource preview, cost, env vars, next steps, gates -->
+      <section id="plan-output" class="card-plan" aria-live="polite"></section>
+
+      <footer>
+        <p class="muted">
+          ACV Deployment Assistant · Phase 3.5 preview · No resources are created by this page.
+          See <code>docs/deployment-experience.md</code> for the full concept.
+        </p>
+      </footer>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

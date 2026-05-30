@@ -22,7 +22,8 @@ Generic, shareable, and safe for the public remote.
 | [implementation-plan.md](implementation-plan.md) | Phased plan, current phase, completed work, open tasks, risks. |
 | [configuration-model.md](configuration-model.md) | Dataverse configuration & metadata model design. |
 | [azure-resources.md](azure-resources.md) | Proposed Azure resource plan (plan only — no provisioning). |
-| [deployment-guide.md](deployment-guide.md) | How to deploy the solution from scratch. |
+| [deployment-experience.md](deployment-experience.md) | End-user/admin deployment concept: HTML Deployment Assistant, managed/unmanaged solutions, approval gates, MVP vs production hardening. |
+| [deployment-guide.md](deployment-guide.md) | How an administrator deploys the solution in their own tenant. |
 | [admin-guide.md](admin-guide.md) | How an administrator configures the channel. |
 | [end-user-guide.md](end-user-guide.md) | How agents and supervisors use the solution. |
 | [security-and-compliance.md](security-and-compliance.md) | Identity, tokens, recording access, consent, retention, deletion, audit. |

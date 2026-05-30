@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> **Version:** 0.1.0 · **Current phase:** Phase 3 (ACS token service + customer entry point — **scaffolding only, mocks**).
+> **Version:** 0.1.0 · **Current phase:** Phase 3.5 (deployment experience & Git alignment — **scaffold + docs only**).
 > This file is the single source of truth for phase status, open tasks, and risks. Update it every
 > meaningful release.
 
@@ -11,8 +11,7 @@
 | 0 | Environment, access & readiness validation | ✅ Done | — |
 | 1 | Repository & project foundation | ✅ Done | — |
 | 2 | Azure foundation (plan only) | 🟡 Planning done — **awaiting provisioning approval** | 👤 Azure cost approval |
-| 3 | ACS token service + customer entry point | � Scaffolding done (mocks) — **awaiting Azure/ACS approval to wire real services** | 👤 Azure/ACS approval |
-| 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
+| 3 | ACS token service + customer entry point | � Scaffolding done (mocks) — **awaiting Azure/ACS approval to wire real services** | 👤 Azure/ACS approval || 3.5 | Deployment experience & Git alignment | 🟡 Scaffold + docs done (deployment assistant preview) | — || 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
 | 5 | Dynamics 365 / Dataverse configuration model | 🔲 Not started | 👤 D365 schema approval |
 | 6 | Dynamics workspace integration (CIF v2) | 🔲 Not started | 👤 D365 config approval |
 | 7 | Agent-side media experience (PCF/web) | 🔲 Not started | — |
@@ -60,6 +59,26 @@ Legend: ✅ done · 🟡 in progress · 🔲 not started · 👤 requires user d
   mode (local preview only); `RealCallController` placeholder for the ACS Calling SDK. Type-check verified.
 - Placeholder config only (`local.settings.json.example`, `.env.example`) — no secrets/tenant values.
 - Added ADR-0006 (storage split) and ADR-0007 (.NET 8 isolated runtime).
+- **No real ACS/Dataverse/Storage calls; no Azure or Dynamics 365 changes.**
+
+### Phase 3.5 — Deployment experience & Git alignment (scaffold + docs only)
+
+**Why this phase exists before any real Azure/Dynamics work:** the deliverable must be deployable
+by an administrator who is *not* the author. Designing the deployment experience now — before
+provisioning real resources or touching Dynamics 365 — ensures naming, RBAC, cost, configuration,
+and the eventual managed/unmanaged Power Platform solutions are coherent and repeatable, instead of
+being retrofitted around a developer-only setup.
+
+- `src/deployment-assistant/` (TypeScript + Vite): a **local, static** HTML wizard that collects
+  deployment inputs, validates them locally, warns against pasting secrets, and renders a
+  **deployment plan preview** (resource table + proposed names, cost impact, RBAC explanation,
+  app-settings template, example Bicep parameters, manual Portal steps, approval gates) with text
+  export. Makes **no Azure/Dynamics calls**; stores no secrets; no tenant values. Type-check verified.
+- `docs/deployment-experience.md`: end-user deployment concept (HTML wizard, managed/unmanaged
+  solutions, Azure setup, Dynamics setup, admin decisions, MVP vs production hardening, approval gates).
+- `docs/deployment-guide.md`: rewritten for a real administrator deploying in their own tenant.
+- `docs/azure-resources.md` §18: how the assistant guides resource creation (mapped to the plan).
+- `docs/admin-guide.md`: early section on the future admin setup experience.
 - **No real ACS/Dataverse/Storage calls; no Azure or Dynamics 365 changes.**
 
 ---
