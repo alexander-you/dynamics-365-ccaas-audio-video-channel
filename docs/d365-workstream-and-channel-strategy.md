@@ -167,10 +167,10 @@ flowchart LR
 | **C0** | Lock this design + record discovery (this section) | Yes (docs only) | ✅ done |
 | **C4** | Stand up **Azure relay** (Entra app + Function App) + deploy relay code | Azure provisioning | ✅ done |
 | **C1b** | Register the **Custom Messaging channel** record (credentials + webhook) + managed-identity FIC auth | Yes (Dataverse + Graph) | ✅ done |
-| **C1a** | Create POC **messaging workstream** (record), POC **queue**, **routing rule**, **capacity profile**; bind to the channel | Mostly yes (Dataverse records) | needs go |
-| **C2** | **Scripted inbound**: call the inbound messaging API with a mock A/V context to create a routed conversation | Yes (once C1a exists) | needs go |
-| **C3** | On accept, panel reads conversation context and launches the **mock** media session; validate end-to-end | Yes | needs go |
-| **C5** | Swap `MockMediaSession` → `RealMediaSession` (real ACS + token service) | Azure/ACS provisioning | separate approval |
+| **C1a** | Create POC **messaging workstream** (record), POC **queue**, **routing rule**, **capacity profile**; bind to the channel | Mostly yes (Dataverse records) | ✅ done |
+| **C2** | **Scripted inbound**: call the inbound messaging API with a mock A/V context to create a routed conversation | Yes (once C1a exists) | ✅ done |
+| **C3** | On accept, panel reads conversation context and launches the **mock** media session; validate end-to-end | Yes | ✅ done |
+| **C5** | Swap `MockMediaSession` → `RealMediaSession` (real ACS + token service) | Azure/ACS provisioning | **separate approval — not started** |
 
 ### 6.4 Open decision (blocks C1b/C2)
 
@@ -273,3 +273,52 @@ channel does not create any conversation or start any media.
 
 **Rollback (C1b):** delete the wizard-created `msdyn_occustommessagingchannel` (`e8e6253e-…`) and its
 `managedidentity` (`ebe6253e-…`) records, and remove the `oc-msg-webhook-fic` federated credential. All reversible.
+
+### 6.8 C2 done (2026-05-30): first real routed conversation via the live relay
+
+The channel was bound directly to the messaging workstream by the C1b wizard (satisfying **C1a** with the
+default queue/routing/capacity), so no new workstream/queue/routing records were created. The relay was
+flipped to **live** mode and a scripted inbound call created a **real routed Custom Messaging conversation**
+in **Demo Contact Center EN** carrying a mock A/V context. **No real ACS media is involved** — the
+conversation is a routed work item only; media stays mock until C5.
+
+| Item | Value |
+|---|---|
+| Messaging API route | `POST /api/v1.0/consumer/conversation/create` (consumer messaging runtime) |
+| Relay → D365 result | `POST /api/inbound` → **202** `{ accepted:true, mode:'live', conversationId:'62827756-fdb9-4c15-8184-e821f13586cf' }` |
+| Verification | `msdyn_ocliveworkitems` top item `activityid = 62827756-…`, `statecode=0` (Active), `statuscode=2` |
+| Storage auth fix | `func-acv-byoc-relay-vnusoc` `AzureWebJobsStorage` converted to **identity-based** (`__accountName` / `__credential=managedidentity` / `__clientId`) so the host key store works under the shared-key-disabled policy |
+
+> **Messaging API contract (verified):** body `{ customercontext, conversationcontext, conversationrequestid,
+> startmessage, skipdeflectionbot }`; response `{ conversationId, isNew, messageId }`. The earlier
+> `/conversation/create` route returned `404 RouteNotFound` and was corrected to the `/api/v1.0/consumer/…`
+> path.
+
+**Rollback (C2):** set `RELAY_MODE=mock`, remove the `OC_*` app settings, and close conversation
+`62827756-…` (`POST /api/v1.0/consumer/conversation/{id}` ending activity). Reversible.
+
+### 6.9 C3 done (2026-05-30): panel reads conversation context + launches mock media
+
+The agent media panel now resolves the **incoming A/V conversation context at runtime** and drives the
+mock media launch from it (instead of build-time mock defaults). The context keys mirror the relay
+`conversationcontext` it attaches in C2. **Media remains mock** — no ACS, no tokens, no Dataverse writes.
+
+| Element | Detail |
+|---|---|
+| Context resolver | `src/agent-media-panel/src/context.ts` — `parseAvContext` / `readAvContext` resolve `mode`, `requestedMedia` (`audio` \| `audio-video`), `sessionRef`, `caseNumber`, `caseTitle`, `contactName` |
+| Precedence | URL query → CIF environment custom params (`CifBridge.getContextOverrides()`) → Vite env → defaults |
+| Media honoring | `MockMediaSession` is context-driven (`createMediaSession(ctx)`); **audio-only** requests start both participants **camera-off** |
+| UI | New **Incoming A/V context** section in `agentPanel.ts` surfaces the resolved context |
+| Validation | `typecheck` + `build` pass; browser test with `?requestedMedia=audio…` → connected mock session, both participants camera-off; `audio-video` enables the customer camera |
+| Delivery | PR #17 merged to `main` (`f5ba876`); GitHub Pages deploy green |
+
+**Rollback (C3):** revert PR #17 (code-only, no infra). Reversible.
+
+### 6.10 C5 (not started): real ACS media — **awaiting separate approval**
+
+C5 is the only remaining gate. It swaps `MockMediaSession` → `RealMediaSession` and wires the real ACS
+token service + media SDK. It provisions/uses **real ACS resources, real tokens, and live media**, so it is
+held behind an **explicit, separate approval** and has **not** been started. Planned execution order once
+approved: provision ACS in `rg-acv-byoc-poc` → stand up the token endpoint (managed identity, Key Vault) →
+implement `RealMediaSession` against the existing `MediaSession` interface → validate audio-only then
+audio-video against a live conversation → keep `RELAY_MODE` controls for instant rollback to mock.
