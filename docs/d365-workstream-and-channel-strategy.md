@@ -117,3 +117,72 @@ small custom table, which is approved separately.
 
 > Findings from the POC (e.g., whether presence/session APIs behave well enough to support Model A vs
 > Model B) feed the routing decision and are recorded in [known-limitations.md](known-limitations.md).
+
+---
+
+## 6. Option C — Custom Messaging / BYOC bootstrap: gated execution plan
+
+> **Status:** APPROVED to plan and to validate via the **recommended path** (scripted inbound, mock
+> media, isolated POC routing) in **Demo Contact Center EN only**. Each gate below is a separate,
+> reversible step. Media stays **mock** through C1–C4; real ACS is C5 (separate approval).
+
+> **Scope change acknowledgement:** Option C deliberately reverses the Phase 4A "no
+> workstream/queue/routing/capacity" guardrail **for the POC org only**. It introduces a *real routed
+> conversation* (and therefore real capacity consumption for the test agent). It does **not** introduce
+> real ACS media until C5.
+
+### 6.1 Target bootstrap shape
+
+```mermaid
+flowchart LR
+  REQ[A/V request] --> RELAY[BYOC relay<br/>Azure Function — C4]
+  RELAY -->|inbound message API| OC[Omnichannel<br/>Custom Messaging conversation]
+  OC --> UR[Unified Routing<br/>POC messaging workstream + queue]
+  UR --> AGENT[Agent workspace<br/>native messaging session]
+  AGENT -->|on accept, read A/V context| PANEL[Custom A/V panel CIF/app tab]
+  PANEL -->|launch| ACS[ACS media session<br/>MOCK until C5]
+```
+
+### 6.2 Environment discovery (read-only, 2026-05-30, Demo Contact Center EN)
+
+| Finding | Value | Implication |
+|---|---|---|
+| Omnichannel provisioned | Yes (`Omnichannel Configuration` present) | Routing entities available |
+| Custom Messaging channel **definition** | Exists (`msdyn_channeldefinition`, `type=Custom`) | BYOC channel type is registered |
+| Existing **Custom messaging workstream** | `ee900829-d87c-40d2-b0dd-1bc6be067579`, `streamsource=192350002`, **no default queue** | Not reused (production + incomplete) |
+| Custom Messaging channel **instance** | **None found** (only voice/LiveHub instances) | A credentialed inbound endpoint is **not** provisioned |
+| Workstream stream-source for custom messaging | `192350002` | Value to set on a POC workstream |
+
+> **Critical constraint discovered:** a Custom Messaging (BYOC) conversation can only be injected
+> through a **registered channel instance** (with credentials + an inbound endpoint) calling the
+> **Omnichannel inbound messaging runtime API** — this is **not** a plain Dataverse `POST`. The channel
+> instance is created via the **Omnichannel admin center "Custom messaging" setup**, which provisions
+> credentials and the inbound endpoint. Raw-REST creation of a working channel instance is **not**
+> safely scriptable and is therefore **not** attempted.
+
+### 6.3 Gates
+
+| Gate | Action | Scriptable & reversible? | Approval |
+|---|---|---|---|
+| **C0** | Lock this design + record discovery (this section) | Yes (docs only) | ✅ done |
+| **C1a** | Create POC **messaging workstream** (record), POC **queue**, **routing rule**, **capacity profile**; bind to the existing Custom channel definition | Mostly yes (Dataverse records) | needs go |
+| **C1b** | Create the **Custom Messaging channel instance** (credentials + inbound endpoint) | **No — Omnichannel admin center UI** | needs go |
+| **C2** | **Scripted inbound**: call the inbound messaging API with a mock A/V context to create a routed conversation | Yes (once C1b exists) | needs go |
+| **C3** | On accept, panel reads conversation context and launches the **mock** media session; validate end-to-end | Yes | needs go |
+| **C4** | Replace scripted inbound with an **Azure Function relay** (inbound + required outbound webhook) | Azure provisioning | separate approval |
+| **C5** | Swap `MockMediaSession` → `RealMediaSession` (real ACS + token service) | Azure/ACS provisioning | separate approval |
+
+### 6.4 Open decision (blocks C1b/C2)
+
+Because the inbound path requires a credentialed channel **instance** that cannot be safely scripted:
+
+- **Path C-i (admin-center instance):** the admin creates a **Custom Messaging channel instance** in the
+  Omnichannel admin center; then the scriptable pieces (workstream/queue/routing/capacity) and the
+  scripted inbound call can be completed. Most faithful to Option C.
+- **Path C-ii (Model A substitute for now):** validate the *routed work item* end of Option C using a
+  **record-based** workstream (fully scriptable: create a Dataverse record + Record workstream),
+  deferring true BYOC messaging to when the Azure relay (C4) exists. Lower fidelity to "messaging
+  conversation", but unblocks routed-conversation validation without manual provisioning.
+
+> Until this decision is made and C1b is satisfied, **no routed conversation can be created**. The
+> agent will not POST partial/broken Omnichannel provisioning via raw REST.
