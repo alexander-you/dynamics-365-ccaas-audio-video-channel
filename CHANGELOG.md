@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3.5 deployment experience & Git alignment (scaffold + docs only)
+- `src/deployment-assistant/`: local, static HTML wizard (TypeScript + Vite) that collects
+  deployment inputs, validates them locally, warns against pasting secrets, and renders a
+  **deployment plan preview** — resource table with proposed names, cost impact, Managed Identity /
+  RBAC explanation, app-settings template, example Bicep parameters, manual Portal steps, and
+  approval gates — with plain-text export. Makes **no Azure/Dynamics calls**, stores no secrets,
+  contains no tenant values. Type-check verified.
+- `docs/deployment-experience.md`: end-user/admin deployment concept (HTML wizard, managed +
+  unmanaged Power Platform solutions, Azure + Dynamics setup, required admin decisions, MVP vs
+  production hardening, approval gates).
+- `docs/admin-guide.md`: early "admin setup experience" section.
+- `docs/azure-resources.md` §18: how the Deployment Assistant guides resource creation (mapped to the plan).
+- `docs/deployment-guide.md`: rewritten for a real administrator deploying in their own tenant.
+- `docs/implementation-plan.md`: added **Phase 3.5** and the rationale for sequencing it before any
+  real Azure/Dynamics work.
+- `docs/README.md`: added `deployment-experience.md` to the public documentation menu.
+
+### Notes (Phase 3.5)
+- **No Azure resources and no Dynamics 365 changes were made.** The assistant is a preview that
+  deploys nothing and contacts no APIs.
+
 ### Added — Phase 3 scaffolding (code, no real service calls)
 - `src/token-service/`: Azure Functions project (.NET 8 isolated worker) with mock-only
   implementations. HTTP endpoints: `GET /api/health`, `POST /api/token`, `POST /api/session`,

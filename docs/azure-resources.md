@@ -303,3 +303,36 @@ must explicitly confirm:
 - Recording **format** default and **retention** period per channel policy.
 - Whether production needs **multi-region DR** in this phase.
 - Dataverse connection details (Phase 5) for the orchestration Functions.
+
+---
+
+## 18. How the Deployment Assistant guides resource creation
+
+The **Deployment Assistant** (`src/deployment-assistant/`, see
+[deployment-experience.md](deployment-experience.md)) turns this plan into a guided, administrator-
+facing experience. It is a **local, static** wizard and a **preview only** — it provisions nothing
+and calls no Azure APIs.
+
+How it maps onto this document:
+
+| This plan (§) | Assistant step | What the admin gets |
+|---|---|---|
+| §2 Resource group | Inputs | Enter/choose RG name; flag create-vs-existing |
+| §3 Region | Inputs | Pick from suggested regions or type any |
+| §4–§9 Resources | Resource plan preview | Per-resource purpose + **proposed name** from §11 |
+| §10 Managed Identity & RBAC | RBAC explanation | Identity → role → scope → why (no assignment made) |
+| §11 Naming convention | Naming preview | Names derived live from prefix/env/region |
+| §12 App settings | Env-vars template | Copy-ready settings; secrets shown as Key Vault refs |
+| §13 Deployment sequence | Manual steps | Per-resource Portal steps if not using IaC |
+| §14 Cost considerations | Cost impact | Per-resource cost level; ACS flagged as main driver |
+| §15 Approval gate | Approval gates | Explicit ✋ gates that must pass before provisioning |
+
+The assistant additionally:
+
+- Generates an **example Bicep parameters** object (illustrative, not executed) so the same inputs
+  can later feed Infrastructure-as-Code.
+- Warns if the admin pastes anything that looks like a **secret**, and stores nothing.
+- Lets the admin **export** the plan as text to review and approve offline.
+
+> The assistant never substitutes for the §15 approval gate. It makes the decisions visible and
+> repeatable; a human still approves cost, naming, and RBAC before anything is created.
