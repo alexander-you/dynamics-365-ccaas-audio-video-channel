@@ -21,6 +21,7 @@ Generic, shareable, and safe for the public remote.
 | [business-overview.md](business-overview.md) | Business goal, use cases, user roles, expected value. |
 | [implementation-plan.md](implementation-plan.md) | Phased plan, current phase, completed work, open tasks, risks. |
 | [configuration-model.md](configuration-model.md) | Dataverse configuration & metadata model design. |
+| [azure-resources.md](azure-resources.md) | Proposed Azure resource plan (plan only — no provisioning). |
 | [deployment-guide.md](deployment-guide.md) | How to deploy the solution from scratch. |
 | [admin-guide.md](admin-guide.md) | How an administrator configures the channel. |
 | [end-user-guide.md](end-user-guide.md) | How agents and supervisors use the solution. |

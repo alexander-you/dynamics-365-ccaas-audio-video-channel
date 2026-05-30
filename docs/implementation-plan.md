@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> **Version:** 0.1.0 · **Current phase:** Phase 1 (Repository & project foundation) — completing.
+> **Version:** 0.1.0 · **Current phase:** Phase 2 (Azure foundation — **planning only**).
 > This file is the single source of truth for phase status, open tasks, and risks. Update it every
 > meaningful release.
 
@@ -9,8 +9,8 @@
 | Phase | Title | Status | Gate |
 |---|---|---|---|
 | 0 | Environment, access & readiness validation | ✅ Done | — |
-| 1 | Repository & project foundation | 🟡 In progress | — |
-| 2 | Azure foundation (plan only) | 🔲 Not started | 👤 Azure cost approval |
+| 1 | Repository & project foundation | ✅ Done | — |
+| 2 | Azure foundation (plan only) | 🟡 Planning done — **awaiting provisioning approval** | 👤 Azure cost approval |
 | 3 | ACS token service + customer entry point | 🔲 Not started | — |
 | 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
 | 5 | Dynamics 365 / Dataverse configuration model | 🔲 Not started | 👤 D365 schema approval |
@@ -43,6 +43,14 @@ Legend: ✅ done · 🟡 in progress · 🔲 not started · 👤 requires user d
   known limitations, deployment/admin/end-user guide skeletons.
 - Added the first ADRs.
 
+### Phase 2 — Azure foundation (planning only)
+- Authored [azure-resources.md](azure-resources.md): proposed resource inventory, resource group,
+  region guidance, ACS/Function App/storage/Event Grid/App Insights/Key Vault names, Managed
+  Identity + RBAC model, naming convention, environment variables, deployment sequence, cost
+  considerations, and the explicit pre-provisioning approval gate.
+- Recorded proposed concrete names and pending decisions in `private/environments.md` (git-ignored).
+- **No Azure resources created, modified, or deleted.**
+
 ---
 
 ## Open tasks (next)
@@ -50,8 +58,10 @@ Legend: ✅ done · 🟡 in progress · 🔲 not started · 👤 requires user d
 | # | Task | Phase | Owner | Blocks |
 |---|---|---|---|---|
 | T1 | Confirm target Azure subscription/RG/region | 2 | 👤 User | Azure provisioning |
-| T2 | Approve Azure resource creation (cost) | 2 | 👤 User | Phase 2 |
-| T3 | Author `azure-resources.md` plan (names/regions/RBAC) | 2 | Agent | — |
+| T2 | Approve Azure resource creation (cost) | 2 | 👤 User | Azure provisioning |
+| T3 | Author `azure-resources.md` plan (names/regions/RBAC) | 2 | Agent | ✅ Done |
+| T3a | Decide runtime/hosting/redundancy/IaC/CMK (azure-resources §15) | 2 | 👤 User | Azure provisioning |
+| T3b | Provide session volume/concurrency for cost modeling | 2 | 👤 User | Cost sign-off |
 | T4 | Confirm D365 environment + solution + publisher | 5/6 | 👤 User | Phase 5/6 |
 | T5 | Approve Dataverse schema before creation | 5 | 👤 User | Phase 5 |
 | T6 | Define routing approach (workstream/queue/capacity) | 9 | 👤 User | Phase 9 |
