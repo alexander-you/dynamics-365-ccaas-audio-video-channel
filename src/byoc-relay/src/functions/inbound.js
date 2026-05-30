@@ -8,9 +8,14 @@ import { createConversation, isLive } from '../lib/omnichannel.js';
 //
 // POST /api/inbound
 // Body: { "customerName": "Jane Doe", "avContext": { "callId": "...", "mode": "mock" } }
+//
+// authLevel 'anonymous' so the browser-based customer page can create a routed conversation
+// without embedding a function key. POC scope: the relay lives in an isolated RG and only
+// creates D365 work items. A production deployment must authenticate the caller (e.g. a
+// signed customer session) before injecting conversations.
 app.http('inbound', {
   methods: ['POST'],
-  authLevel: 'function',
+  authLevel: 'anonymous',
   route: 'inbound',
   handler: async (request, context) => {
     let body;

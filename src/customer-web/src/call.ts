@@ -33,7 +33,7 @@ export interface CallController {
 // Group GUID the agent panel joins by default; the customer joins the same group.
 const DEFAULT_GROUP_ID = "7a9f5c2e-0b1d-4e6a-9c3f-1a2b3c4d5e6f";
 
-function readGroupId(): string {
+export function readGroupId(): string {
   const env = import.meta.env as Record<string, string | undefined>;
   return env.VITE_ACS_GROUP_ID ?? DEFAULT_GROUP_ID;
 }
