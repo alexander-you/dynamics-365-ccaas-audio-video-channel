@@ -1,0 +1,19 @@
+{
+  "name": "byoc-relay",
+  "version": "0.1.0",
+  "description": "BYOC (Bring Your Own Channel) Messaging API relay for the custom ACS Audio/Video channel POC. Injects mock A/V conversations into Dynamics 365 Contact Center and receives agent activities via webhook.",
+  "private": true,
+  "main": "src/functions/*.js",
+  "type": "module",
+  "scripts": {
+    "start": "func start",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0",
+    "@azure/identity": "^4.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

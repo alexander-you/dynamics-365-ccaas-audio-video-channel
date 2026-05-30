@@ -210,3 +210,39 @@ capacity) → **C2** (scripted inbound) → **C3** (panel reads context, launche
 
 > **No Dynamics 365 routing changes were made for Option C.** Provider/widget surfacing from Part 2
 > remains the only live custom-channel configuration; media remains mock.
+
+### 6.6 C4 progress (2026-05-30): Azure relay provisioned + relay code deployed
+
+Azure prerequisites approved and provisioned in a **new isolated resource group** `rg-acv-byoc-poc`
+(`westeurope`), entirely separate from any production resource. No real ACS media is involved.
+
+| C4 sub-gate | Deliverable | Status |
+|---|---|---|
+| **C4a** | Entra app registration `acv-byoc-relay-poc` (client-credentials), client secret stored in Key Vault `kv-acvbyoc-mb9cs2` (never displayed) | ✅ done |
+| **C4b** | Function App `func-acv-byoc-relay-vnusoc` (Flex Consumption, Node, Linux), user-assigned identity for deployment storage, App Insights | ✅ done |
+| **C4c** | Relay code: `inbound`, `webhook`, `health` functions (mock-first) — see [src/byoc-relay](../src/byoc-relay/README.md) | ✅ deployed |
+
+**Relay endpoints** (base `https://func-acv-byoc-relay-vnusoc.azurewebsites.net/api`):
+
+| Endpoint | Direction | Purpose |
+|---|---|---|
+| `POST /inbound` | relay → D365 | Create a routed Custom Messaging conversation with a **mock** A/V context. |
+| `POST /v3/conversations/{conversationId}/activities` | D365 → relay | Outbound webhook (Bot Framework Activity Schema); registered as the channel **callback** base URL. |
+| `GET /health` | — | Liveness + `mock`/`live` mode. |
+
+The relay implements the **Dynamics 365 Contact Center Messaging API** contract
+([overview](https://learn.microsoft.com/en-us/dynamics365/contact-center/extend/intro-messaging-apis),
+[configuration](https://learn.microsoft.com/en-us/dynamics365/contact-center/extend/configure-custom-messaging-channel)):
+base `https://m-{org_id}.{geo}.omnichannelengagementhub.com`, OAuth2 client-credentials with scope
+`https://{org_id_without_dash}-c.{zone}.dynamics.com/.default`, and headers `channel-id` /
+`organization-id`. It stays **mock-first** (`RELAY_MODE=mock`): no token is acquired and no D365 call is
+made until `live` is enabled. No real ACS media until **C5**.
+
+> **Correction to §6.2 / §6.3 (C1b).** The Messaging API docs show the custom messaging channel can be
+> **registered by creating an `msdyn_occustommessagingchannel` Dataverse record** (`msdyn_occustomchannelid`
+> = `192350005` MessagingAPI, plus `msdyn_appid`, `msdyn_tenantid`, `msdyn_webhookurl`) — i.e. C1b is in
+> fact **scriptable** and does **not** strictly require the admin-center "Add account" wizard. Webhook
+> authentication uses a Power Platform **managed identity** record + **federated identity credential
+> (FIC)** on the Entra app (subject from `GetComponentManagedIdentityFIC`). This supersedes the earlier
+> "not safely scriptable" note for the channel instance; C1b remains **needs-go** and will be done as a
+> deliberate, reversible step.

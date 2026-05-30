@@ -1,0 +1,21 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "",
+
+    "// --- Omnichannel Messaging API (inbound: relay -> D365) ---": "",
+    "OC_BASE_URL": "https://m-{org_id}.{geo}.omnichannelengagementhub.com",
+    "OC_ORG_ID": "{organization_id_guid}",
+    "OC_CHANNEL_ID": "{custom_channel_id_guid}",
+    "OC_TOKEN_SCOPE": "https://{org_id_without_dash}-c.{zone}.dynamics.com/.default",
+    "OC_TENANT_ID": "{azure_tenant_id_guid}",
+    "OC_CLIENT_ID": "{entra_app_id_guid}",
+
+    "// --- Client secret: prefer Key Vault reference in Azure; never commit a real value ---": "",
+    "OC_CLIENT_SECRET": "",
+
+    "// --- Mock-only switch. Keep true until C5 (real ACS) is approved. ---": "",
+    "RELAY_MODE": "mock"
+  }
+}
