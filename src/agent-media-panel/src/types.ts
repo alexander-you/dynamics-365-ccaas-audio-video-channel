@@ -2,6 +2,8 @@
 // These types describe the SHAPE of an agent-side media session. They contain no tenant data
 // and are independent of the ACS SDK so the UI can be built and tested without real ACS.
 
+import type { RequestedMedia } from "./context";
+
 /** High-level connection state of the agent in a session. */
 export type SessionState = "idle" | "joining" | "connected" | "leaving" | "disconnected" | "error";
 
@@ -56,5 +58,11 @@ export interface SessionSnapshot {
   consent: ConsentStatus;
   participants: Participant[];
   caseContext: CaseContext;
+  /** Relay mode that created the conversation ("mock"/"live"). Display-only. */
+  mode: string;
+  /** Media the customer requested; drives the agent's initial camera state. */
+  requestedMedia: RequestedMedia;
+  /** Correlation reference from the relay (conversationrequestid / sessionRef). */
+  sessionRef: string;
   message?: PanelMessage;
 }
