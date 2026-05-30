@@ -45,6 +45,11 @@ export interface IMediaSession {
   // service and Event Grid, not control them directly.
   simulateConsent(status: ConsentStatus): void;
   simulateRecording(status: RecordingStatus): void;
+
+  // Optional: render live video tiles into a panel-provided container. Mock sessions omit this;
+  // the real ACS session draws local + remote video streams here. Passing an HTMLElement keeps ACS
+  // renderer types from leaking through the interface.
+  attachVideo?(stage: HTMLElement): void;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -201,55 +206,382 @@ function delay(ms: number): Promise<void> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// RealMediaSession — placeholder. NOT implemented in Phase 3c.
+// RealMediaSession — real Azure Communication Services group call (C5).
+//
+// Flow: fetch a VoIP token from the relay token endpoint (server-minted from the ACS connection
+// string in Key Vault) -> AzureCommunicationTokenCredential -> CallClient.createCallAgent ->
+// join a group call. Local audio is always published; local video is published when the customer
+// requested audio-video. Remote participants and their video streams are reflected into the
+// SessionSnapshot and rendered into the panel-provided video stage.
+//
+// Consent/recording remain simulated overlays here (server-authoritative via Call Recording +
+// Event Grid in a later phase); the agent UI can still preview those states.
 // -------------------------------------------------------------------------------------------------
+import {
+  CallClient,
+  LocalVideoStream,
+  VideoStreamRenderer
+} from "@azure/communication-calling";
+import type {
+  CallAgent,
+  Call,
+  DeviceManager,
+  RemoteParticipant,
+  RemoteVideoStream,
+  VideoStreamRendererView,
+  VideoDeviceInfo
+} from "@azure/communication-calling";
+import { AzureCommunicationTokenCredential, getIdentifierRawId } from "@azure/communication-common";
+
+export interface AcsConfig {
+  /** Token endpoint that mints a VoIP ACS token (relay POST /api/token). */
+  tokenUrl: string;
+  /** Group-call GUID the agent joins. The customer entry point joins the same group. */
+  groupId: string;
+}
+
+const DEFAULT_GROUP_ID = "7a9f5c2e-0b1d-4e6a-9c3f-1a2b3c4d5e6f";
+
+export function readAcsConfig(): AcsConfig {
+  const env = import.meta.env as Record<string, string | undefined>;
+  return {
+    tokenUrl:
+      env.VITE_TOKEN_URL ??
+      "https://func-acv-byoc-relay-vnusoc.azurewebsites.net/api/token",
+    groupId: env.VITE_ACS_GROUP_ID ?? DEFAULT_GROUP_ID
+  };
+}
+
+type TokenResponse = { userId: string; token: string; expiresOn: string; endpoint: string | null };
+
 export class RealMediaSession implements IMediaSession {
   readonly isMock = false;
+  private snapshot: SessionSnapshot;
+  private listeners = new Set<MediaSessionListener>();
+  private readonly ctx: AvContext;
+  private readonly config: AcsConfig;
 
-  private fail(): never {
-    throw new Error(
-      "RealMediaSession is not implemented in Phase 3c. Keep VITE_USE_MOCKS=true until ACS is approved. " +
-        "The real implementation will use @azure/communication-calling with a server-issued token."
+  private callClient?: CallClient;
+  private callAgent?: CallAgent;
+  private deviceManager?: DeviceManager;
+  private call?: Call;
+  private localVideoStream?: LocalVideoStream;
+  private views: VideoStreamRendererView[] = [];
+
+  constructor(ctx: AvContext = readAvContext(), config: AcsConfig = readAcsConfig()) {
+    this.ctx = ctx;
+    this.config = config;
+    this.snapshot = this.initialSnapshot();
+  }
+
+  private initialSnapshot(): SessionSnapshot {
+    const audioOnly = this.ctx.requestedMedia === "audio";
+    const refNote = this.ctx.sessionRef ? ` (ref ${this.ctx.sessionRef})` : "";
+    return {
+      state: "idle",
+      isMock: false,
+      local: { micMuted: false, cameraOff: audioOnly, sharingScreen: false },
+      recording: "not-recording",
+      consent: "unknown",
+      participants: [],
+      caseContext: caseFromContext(this.ctx),
+      mode: this.ctx.mode,
+      requestedMedia: this.ctx.requestedMedia,
+      sessionRef: this.ctx.sessionRef,
+      message: {
+        severity: "info",
+        text: `Live ACS — ${this.ctx.requestedMedia} interaction${refNote}. Joining group ${this.config.groupId}.`
+      }
+    };
+  }
+
+  subscribe(listener: MediaSessionListener): () => void {
+    this.listeners.add(listener);
+    listener.onSnapshot(this.snapshot);
+    return () => this.listeners.delete(listener);
+  }
+
+  getSnapshot(): SessionSnapshot {
+    return this.snapshot;
+  }
+
+  private update(patch: Partial<SessionSnapshot>, message?: PanelMessage): void {
+    this.snapshot = { ...this.snapshot, ...patch, message: message ?? this.snapshot.message };
+    for (const l of this.listeners) l.onSnapshot(this.snapshot);
+  }
+
+  private async fetchToken(): Promise<TokenResponse> {
+    const res = await fetch(this.config.tokenUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}"
+    });
+    if (!res.ok) {
+      throw new Error(`Token endpoint returned ${res.status}.`);
+    }
+    return (await res.json()) as TokenResponse;
+  }
+
+  async join(): Promise<void> {
+    if (this.call) return;
+    this.update({ state: "joining" }, { severity: "info", text: "Acquiring ACS token…" });
+    try {
+      const { token } = await this.fetchToken();
+      const credential = new AzureCommunicationTokenCredential(token);
+      this.callClient = new CallClient();
+      this.callAgent = await this.callClient.createCallAgent(credential, {
+        displayName: "Agent"
+      });
+      this.deviceManager = await this.callClient.getDeviceManager();
+
+      const wantVideo = this.ctx.requestedMedia === "audio-video";
+      let localVideoStreams: LocalVideoStream[] | undefined;
+      if (wantVideo) {
+        const camera = await this.firstCamera();
+        if (camera) {
+          this.localVideoStream = new LocalVideoStream(camera);
+          localVideoStreams = [this.localVideoStream];
+        }
+      }
+
+      this.call = this.callAgent.join(
+        { groupId: this.config.groupId },
+        localVideoStreams ? { videoOptions: { localVideoStreams } } : {}
+      );
+      this.wireCall(this.call);
+      this.update(
+        { state: "connected", local: { ...this.snapshot.local, cameraOff: !wantVideo || !this.localVideoStream } },
+        { severity: "info", text: "Connected to ACS group call." }
+      );
+      this.refreshParticipants();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.update(
+        { state: "error" },
+        {
+          severity: "error",
+          text: `Could not join the ACS call: ${message}`,
+          fallbackHint: "Check the token endpoint and camera/microphone permissions."
+        }
+      );
+    }
+  }
+
+  private async firstCamera(): Promise<VideoDeviceInfo | undefined> {
+    if (!this.deviceManager) return undefined;
+    try {
+      await this.deviceManager.askDevicePermission({ audio: true, video: true });
+    } catch {
+      /* permission prompt may be unavailable; continue and let getCameras report */
+    }
+    const cameras = await this.deviceManager.getCameras();
+    return cameras[0];
+  }
+
+  private wireCall(call: Call): void {
+    call.on("stateChanged", () => {
+      if (call.state === "Disconnected") {
+        this.update({ state: "disconnected", participants: [] }, { severity: "info", text: "Call ended." });
+      }
+      this.refreshParticipants();
+    });
+    call.on("remoteParticipantsUpdated", (e) => {
+      for (const p of e.added) this.wireParticipant(p);
+      this.refreshParticipants();
+    });
+    call.on("localVideoStreamsUpdated", () => this.refreshParticipants());
+    for (const p of call.remoteParticipants) this.wireParticipant(p);
+  }
+
+  private wireParticipant(p: RemoteParticipant): void {
+    p.on("stateChanged", () => this.refreshParticipants());
+    p.on("isMutedChanged", () => this.refreshParticipants());
+    p.on("videoStreamsUpdated", (e) => {
+      for (const s of e.added) s.on("isAvailableChanged", () => this.refreshParticipants());
+      this.refreshParticipants();
+    });
+    for (const s of p.videoStreams) s.on("isAvailableChanged", () => this.refreshParticipants());
+  }
+
+  private refreshParticipants(): void {
+    const remote: Participant[] = (this.call?.remoteParticipants ?? []).map((p) => {
+      const video = p.videoStreams.find((s) => s.mediaStreamType === "Video" && s.isAvailable);
+      const screen = p.videoStreams.find((s) => s.mediaStreamType === "ScreenSharing" && s.isAvailable);
+      return {
+        id: getIdentifierRawId(p.identifier),
+        displayName: p.displayName || "Customer",
+        role: "customer",
+        connection: mapConnection(p.state),
+        micMuted: p.isMuted,
+        cameraOn: Boolean(video),
+        isSharingScreen: Boolean(screen)
+      };
+    });
+    const agent: Participant = {
+      id: "agent-self",
+      displayName: "You (Agent)",
+      role: "agent",
+      connection: "connected",
+      micMuted: this.snapshot.local.micMuted,
+      cameraOn: !this.snapshot.local.cameraOff,
+      isSharingScreen: this.snapshot.local.sharingScreen
+    };
+    this.update({ participants: [agent, ...remote] });
+  }
+
+  async leave(): Promise<void> {
+    this.update({ state: "leaving" }, { severity: "info", text: "Leaving the ACS call…" });
+    this.disposeViews();
+    try {
+      await this.call?.hangUp();
+    } catch {
+      /* ignore hang-up races */
+    }
+    this.call = undefined;
+    this.localVideoStream = undefined;
+    try {
+      this.callAgent?.dispose();
+    } catch {
+      /* ignore */
+    }
+    this.callAgent = undefined;
+    this.update(
+      {
+        state: "disconnected",
+        participants: [],
+        recording: "not-recording",
+        local: { micMuted: false, cameraOff: this.ctx.requestedMedia === "audio", sharingScreen: false }
+      },
+      { severity: "info", text: "Disconnected. You can re-join." }
     );
   }
 
-  subscribe(): () => void {
-    this.fail();
+  async setMicMuted(muted: boolean): Promise<void> {
+    if (this.call) {
+      if (muted) await this.call.mute();
+      else await this.call.unmute();
+    }
+    this.update({ local: { ...this.snapshot.local, micMuted: muted } });
+    this.refreshParticipants();
   }
-  getSnapshot(): SessionSnapshot {
-    this.fail();
+
+  async setCameraOff(off: boolean): Promise<void> {
+    if (this.call) {
+      if (off) {
+        if (this.localVideoStream) await this.call.stopVideo(this.localVideoStream);
+      } else {
+        const camera = this.localVideoStream?.source ?? (await this.firstCamera());
+        if (camera) {
+          this.localVideoStream = this.localVideoStream ?? new LocalVideoStream(camera);
+          await this.call.startVideo(this.localVideoStream);
+        }
+      }
+    }
+    this.update({ local: { ...this.snapshot.local, cameraOff: off } });
+    this.refreshParticipants();
   }
-  join(): Promise<void> {
-    // Real flow (later phase, after ACS approval):
-    //   const token = await fetch("/api/token", ...);  // server-minted via Managed Identity
-    //   const cred = new AzureCommunicationTokenCredential(token);
-    //   const agent = await new CallClient().createCallAgent(cred);
-    //   this.call = agent.join({ roomId });
-    //   wire call.on("stateChanged"/"remoteParticipantsUpdated") -> emit snapshots
-    this.fail();
+
+  async setScreenSharing(on: boolean): Promise<void> {
+    if (this.call) {
+      if (on) await this.call.startScreenSharing();
+      else await this.call.stopScreenSharing();
+    }
+    this.update({ local: { ...this.snapshot.local, sharingScreen: on } });
+    this.refreshParticipants();
   }
-  leave(): Promise<void> {
-    this.fail();
+
+  simulateConsent(status: ConsentStatus): void {
+    const msg: PanelMessage =
+      status === "declined"
+        ? { severity: "warning", text: "Customer declined consent. Recording must stay off.", fallbackHint: "Continue without recording." }
+        : { severity: "info", text: `Consent status: ${status}.` };
+    this.update({ consent: status }, msg);
   }
-  setMicMuted(): Promise<void> {
-    this.fail();
+
+  simulateRecording(status: RecordingStatus): void {
+    if (status !== "not-recording" && this.snapshot.consent !== "granted") {
+      this.update(
+        {},
+        { severity: "error", text: "Cannot record without granted consent.", fallbackHint: "Capture consent first." }
+      );
+      return;
+    }
+    this.update({ recording: status }, { severity: "info", text: `Recording status: ${status}.` });
   }
-  setCameraOff(): Promise<void> {
-    this.fail();
+
+  attachVideo(stage: HTMLElement): void {
+    this.disposeViews();
+    stage.innerHTML = "";
+    void this.renderLocal(stage);
+    void this.renderRemotes(stage);
   }
-  setScreenSharing(): Promise<void> {
-    this.fail();
+
+  private async renderLocal(stage: HTMLElement): Promise<void> {
+    if (!this.localVideoStream || this.snapshot.local.cameraOff) return;
+    try {
+      const renderer = new VideoStreamRenderer(this.localVideoStream);
+      const view = await renderer.createView();
+      this.views.push(view);
+      stage.appendChild(videoTile(view.target, "You (Agent)"));
+    } catch {
+      /* rendering may fail if the stream stopped; ignore */
+    }
   }
-  simulateConsent(): void {
-    this.fail();
+
+  private async renderRemotes(stage: HTMLElement): Promise<void> {
+    for (const p of this.call?.remoteParticipants ?? []) {
+      const stream: RemoteVideoStream | undefined = p.videoStreams.find((s) => s.isAvailable);
+      if (!stream) continue;
+      try {
+        const renderer = new VideoStreamRenderer(stream);
+        const view = await renderer.createView();
+        this.views.push(view);
+        stage.appendChild(videoTile(view.target, p.displayName || "Customer"));
+      } catch {
+        /* ignore individual stream render failures */
+      }
+    }
   }
-  simulateRecording(): void {
-    this.fail();
+
+  private disposeViews(): void {
+    for (const v of this.views) {
+      try {
+        v.dispose();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.views = [];
   }
 }
 
-/** Factory honoring VITE_USE_MOCKS. Phase 3c always returns the mock unless explicitly disabled. */
+function mapConnection(state: string): Participant["connection"] {
+  switch (state) {
+    case "Connected":
+      return "connected";
+    case "Hold":
+      return "on-hold";
+    case "Disconnected":
+      return "disconnected";
+    default:
+      return "connecting";
+  }
+}
+
+function videoTile(target: HTMLElement, label: string): HTMLElement {
+  const tile = document.createElement("div");
+  tile.className = "amp-video-tile";
+  target.classList.add("amp-video-target");
+  tile.appendChild(target);
+  const caption = document.createElement("span");
+  caption.className = "amp-video-label";
+  caption.textContent = label;
+  tile.appendChild(caption);
+  return tile;
+}
+
+/** Factory honoring VITE_USE_MOCKS. Returns the real ACS session only when explicitly enabled. */
 export function createMediaSession(ctx: AvContext = readAvContext()): IMediaSession {
   const useMocks = (import.meta.env.VITE_USE_MOCKS as string | undefined) !== "false";
-  return useMocks ? new MockMediaSession(ctx) : new RealMediaSession();
+  return useMocks ? new MockMediaSession(ctx) : new RealMediaSession(ctx);
 }

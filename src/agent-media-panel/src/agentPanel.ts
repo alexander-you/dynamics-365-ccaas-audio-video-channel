@@ -101,7 +101,7 @@ export class AgentPanel {
         <h2>Participants (${s.participants.length})</h2>
         ${
           s.participants.length === 0
-            ? `<p class="muted">No participants. Join the session to populate the roster (mock).</p>`
+            ? `<p class="muted">No participants. Join the session to populate the roster${s.isMock ? " (mock)" : ""}.</p>`
             : `<ul>${s.participants
                 .map(
                   (p) => `<li>
@@ -113,6 +113,13 @@ export class AgentPanel {
                 )
                 .join("")}</ul>`
         }
+      </section>
+
+      <section class="amp-video" aria-label="Video">
+        <h2>Video</h2>
+        <div class="amp-video-stage"></div>
+        ${connected ? "" : `<p class="muted">Join the session to show video tiles.</p>`}
+        ${s.isMock ? `<p class="muted">Mock mode shows no live video. Run with <code>VITE_USE_MOCKS=false</code> for real ACS video.</p>` : ""}
       </section>
 
       <section class="amp-cif" aria-label="Dynamics 365 workspace (CIF v2)">
@@ -149,6 +156,10 @@ export class AgentPanel {
     `;
 
     this.bind();
+
+    // Real ACS sessions render live video into the stage; mock sessions ignore this.
+    const stage = this.root.querySelector<HTMLElement>(".amp-video-stage");
+    if (stage) this.session.attachVideo?.(stage);
   }
 
   private renderMessage(s: SessionSnapshot): string {
