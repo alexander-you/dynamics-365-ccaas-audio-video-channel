@@ -4,6 +4,7 @@
 
 import type { IMediaSession } from "./mediaSession";
 import type { SessionSnapshot, RecordingStatus, ConsentStatus } from "./types";
+import { CifBridge, makeMockIncoming, type CifStatus } from "./cif";
 
 const RECORDING_LABELS: Record<RecordingStatus, string> = {
   "not-recording": "Not recording",
@@ -23,10 +24,15 @@ const CONSENT_LABELS: Record<ConsentStatus, string> = {
 export class AgentPanel {
   private root: HTMLElement;
   private session: IMediaSession;
+  private cif: CifBridge;
+  private cifStatus: CifStatus;
+  private lastIncoming = "";
 
-  constructor(root: HTMLElement, session: IMediaSession) {
+  constructor(root: HTMLElement, session: IMediaSession, cif: CifBridge = new CifBridge()) {
     this.root = root;
     this.session = session;
+    this.cif = cif;
+    this.cifStatus = cif.status;
     session.subscribe({ onSnapshot: (s) => this.render(s) });
   }
 
@@ -37,6 +43,7 @@ export class AgentPanel {
         <h1>Agent Media Panel</h1>
         <span class="badge ${s.isMock ? "badge-mock" : "badge-live"}">${s.isMock ? "MOCK MODE" : "LIVE"}</span>
         <span class="state state-${s.state}">${s.state}</span>
+        <span class="cif-badge cif-${this.cifStatus.mode}" title="${esc(this.cifStatus.label)}">${esc(this.cifStatus.label)}</span>
       </header>
 
       ${this.renderMessage(s)}
@@ -98,6 +105,23 @@ export class AgentPanel {
         }
       </section>
 
+      <section class="amp-cif" aria-label="Dynamics 365 workspace (CIF v2)">
+        <h2>Dynamics 365 workspace (CIF v2)</h2>
+        <p class="muted">${esc(this.cifStatus.label)}. ${
+          this.cifStatus.available
+            ? "Workspace actions call Microsoft.CIFramework."
+            : "Outside Dynamics, these actions run as local no-ops for testing."
+        }</p>
+        <div class="btn-row">
+          <button data-cif="simulate-incoming">Simulate incoming Audio/Video interaction</button>
+        </div>
+        <div class="btn-row">
+          <button data-cif="accept" ${this.lastIncoming ? "" : "disabled"}>Accept</button>
+          <button data-cif="reject" class="danger" ${this.lastIncoming ? "" : "disabled"}>Reject</button>
+        </div>
+        ${this.lastIncoming ? `<p class="muted">Last mock interaction: ${esc(this.lastIncoming)}</p>` : ""}
+      </section>
+
       <section class="amp-sim" aria-label="Simulation">
         <h2>Simulate server signals (mock only)</h2>
         <p class="muted">In production, consent and recording status are server-authoritative (token service + Event Grid). These buttons preview those states.</p>
@@ -133,6 +157,9 @@ export class AgentPanel {
     this.root.querySelectorAll<HTMLButtonElement>("button[data-sim]").forEach((btn) => {
       btn.addEventListener("click", () => this.onSim(btn.dataset.sim!));
     });
+    this.root.querySelectorAll<HTMLButtonElement>("button[data-cif]").forEach((btn) => {
+      btn.addEventListener("click", () => this.onCif(btn.dataset.cif!));
+    });
   }
 
   private async onAction(action: string): Promise<void> {
@@ -160,6 +187,41 @@ export class AgentPanel {
     const [kind, value] = sim.split(":");
     if (kind === "consent") this.session.simulateConsent(value as ConsentStatus);
     if (kind === "recording") this.session.simulateRecording(value as RecordingStatus);
+  }
+
+  // CIF v2 workspace actions. All are mock-safe: inside Dynamics they call Microsoft.CIFramework;
+  // standalone they degrade to local no-ops (see cif.ts). No real record IDs are used.
+  private async onCif(action: string): Promise<void> {
+    const ctx = this.session.getSnapshot().caseContext;
+    switch (action) {
+      case "simulate-incoming": {
+        const incoming = makeMockIncoming(ctx.contactName, ctx.caseNumber);
+        this.lastIncoming = incoming.mockInteractionId;
+        // Raise the notification (CIF) or auto-accept (standalone), then run the accept flow.
+        const accepted = await this.cif.notifyIncoming(incoming);
+        this.render(this.session.getSnapshot());
+        if (accepted) await this.acceptFlow();
+        break;
+      }
+      case "accept":
+        await this.acceptFlow();
+        break;
+      case "reject":
+        this.lastIncoming = "";
+        await this.cif.setPresence("Available");
+        this.render(this.session.getSnapshot());
+        break;
+    }
+  }
+
+  /** Accept flow: create/focus session → screen-pop → presence → join the (mock) media session. */
+  private async acceptFlow(): Promise<void> {
+    const ctx = this.session.getSnapshot().caseContext;
+    const incoming = makeMockIncoming(ctx.contactName, ctx.caseNumber);
+    await this.cif.createOrFocusSession(incoming);
+    await this.cif.screenPop("contact", incoming);
+    await this.cif.setPresence("Busy");
+    await this.session.join();
   }
 }
 
