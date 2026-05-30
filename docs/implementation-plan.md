@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> **Version:** 0.1.0 · **Current phase:** Phase 3c (agent workspace & media component — **scaffold + docs only**).
+> **Version:** 0.1.0 · **Current phase:** Phase 4A Part 1 (D365 workspace & channel **planning only** — awaiting environment/solution approval).
 > This file is the single source of truth for phase status, open tasks, and risks. Update it every
 > meaningful release.
 
@@ -15,6 +15,8 @@
 | 3.5 | Deployment experience & Git alignment | ✅ Scaffold + docs done (deployment assistant preview) | — |
 | 3b | IaC & deployment automation scaffold | ✅ Scaffold + docs done (Bicep/scripts, no provisioning) | 👤 Azure provisioning approval |
 | 3c | Agent workspace & media component scaffold | 🟡 Scaffold + docs done (mock web component, not in D365) | 👤 D365 / Power Platform approval |
+| 4A.1 | D365 workspace & channel **planning** (CIF v2, strategy, checklist) | 🟡 Planning docs done — **awaiting environment/solution approval** | 👤 D365 env + checklist approval |
+| 4A.2 | D365 workspace POC (CIF v2, mock panel) | 🔲 Not started | 👤 D365 changes approval |
 | 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
 | 5 | Dynamics 365 / Dataverse configuration model | 🔲 Not started | 👤 D365 schema approval |
 | 6 | Dynamics workspace integration (CIF v2) | 🔲 Not started | 👤 D365 config approval |
@@ -129,6 +131,30 @@ Azure changes — so the UI and the UI↔ACS abstraction are validated and revie
 - Updated architecture (§5.1), admin guide, known-limitations, and CHANGELOG.
 - **No Power Platform solution created/imported; PCF not registered/deployed; no Dataverse
   tables/columns; no CIF v2 config; no real ACS tokens; no secrets stored.**
+
+---
+
+### Phase 4A Part 1 — D365 workspace & channel planning (planning docs only)
+
+**Why:** before touching a Dynamics 365 environment, define *how* the custom ACS A/V channel is
+represented in D365 (workspace, CIF v2, routing strategy, config model) and produce a pre-change
+approval checklist — so the actual POC is reviewable and explicitly approved first.
+
+- [d365-agent-workspace-integration.md](d365-agent-workspace-integration.md): how the **mock** panel
+  integrates into the agent workspace; native-vs-custom split; hosted web component (not PCF yet).
+- [cif-v2-configuration.md](cif-v2-configuration.md): proposed CIF v2 Channel Provider, channel URL
+  strategy, app profile association, notification/accept-reject, session create/focus, screen-pop,
+  presence, limitations.
+- [d365-workstream-and-channel-strategy.md](d365-workstream-and-channel-strategy.md): documents that
+  there is **no native standalone real-time A/V workstream type**; evaluates record-based workstream
+  (recommended), Custom Messaging/BYOC, and ACS Job Router (fallback).
+- [channel-configuration-model.md](channel-configuration-model.md): admin configuration surface
+  (audio/video/screen/recording/consent/transcription/AI summary/queue/capacity/fallback/supervisor/
+  Teams/telemetry); server-authoritative enforcement principle.
+- [d365-pre-change-checklist.md](d365-pre-change-checklist.md): every D365/Power Platform component
+  that would be created or modified, plus the 12 environment/solution values to confirm.
+- **No Dynamics 365 / Power Platform changes made; no solution/provider/app profile/templates/tables
+  created; media stays mock; no Azure/ACS.** Awaiting environment + checklist approval before Part 2.
 
 ---
 

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 4A Part 1 D365 workspace & channel planning (planning docs only)
+- `docs/d365-agent-workspace-integration.md`: plan for integrating the **mock** agent media panel
+  into the D365 Customer Service / Contact Center workspace; native-vs-custom responsibility split;
+  hosted web component first (PCF deferred).
+- `docs/cif-v2-configuration.md`: proposed **CIF v2 Channel Provider** (name, channel URL strategy,
+  app profile association, incoming notification, accept/reject, session create/focus, screen-pop,
+  presence, limitations).
+- `docs/d365-workstream-and-channel-strategy.md`: documents that there is **no native standalone
+  real-time A/V workstream type**; evaluates record-based workstream (recommended), Custom
+  Messaging/BYOC, and external ACS Job Router (fallback only).
+- `docs/channel-configuration-model.md`: admin configuration surface for the custom channel; recording
+  and consent are **server-authoritative**.
+- `docs/d365-pre-change-checklist.md`: pre-change approval checklist of every D365 / Power Platform
+  component that would be created or modified, plus the 12 environment/solution values to confirm.
+- Updated `docs/README.md` menu and `docs/implementation-plan.md` (Phase 4A.1 / 4A.2 rows + section).
+
+### Notes (Phase 4A Part 1)
+- **No Dynamics 365 / Power Platform changes were made.** No solution, publisher, CIF v2 Channel
+  Provider, app profile, session/notification template, web resource, custom table, workstream, queue,
+  or capacity profile was created or modified. Media stays mock; no Azure provisioning; no real ACS.
+
 ### Added — Phase 3c agent workspace & media component scaffold (scaffold + docs only)
 - `src/agent-media-panel/`: framework-neutral **agent media panel** (TypeScript + Vite) with a strict
   `IMediaSession` abstraction between the UI and the future ACS Calling SDK. Mock UI for **join /
