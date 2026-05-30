@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> **Version:** 0.1.0 · **Current phase:** Phase 3b (IaC & deployment automation — **scaffold + docs only**).
+> **Version:** 0.1.0 · **Current phase:** Phase 3c (agent workspace & media component — **scaffold + docs only**).
 > This file is the single source of truth for phase status, open tasks, and risks. Update it every
 > meaningful release.
 
@@ -13,7 +13,8 @@
 | 2 | Azure foundation (plan only) | 🟡 Planning done — **awaiting provisioning approval** | 👤 Azure cost approval |
 | 3 | ACS token service + customer entry point | 🟡 Scaffolding done (mocks) — **awaiting Azure/ACS approval to wire real services** | 👤 Azure/ACS approval |
 | 3.5 | Deployment experience & Git alignment | ✅ Scaffold + docs done (deployment assistant preview) | — |
-| 3b | IaC & deployment automation scaffold | 🟡 Scaffold + docs done (Bicep/scripts, no provisioning) | 👤 Azure provisioning approval |
+| 3b | IaC & deployment automation scaffold | ✅ Scaffold + docs done (Bicep/scripts, no provisioning) | 👤 Azure provisioning approval |
+| 3c | Agent workspace & media component scaffold | 🟡 Scaffold + docs done (mock web component, not in D365) | 👤 D365 / Power Platform approval |
 | 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
 | 5 | Dynamics 365 / Dataverse configuration model | 🔲 Not started | 👤 D365 schema approval |
 | 6 | Dynamics workspace integration (CIF v2) | 🔲 Not started | 👤 D365 config approval |
@@ -106,6 +107,28 @@ a future approved deployment is one well-documented step instead of manual Porta
   [known-limitations.md §6](known-limitations.md).
 - **No Azure resources provisioned; no `az deployment` executed; no Dynamics 365 / Power Platform
   changes; no real ACS/Dataverse/storage connections; `USE_MOCKS` stays `true`.**
+
+---
+
+### Phase 3c — Agent workspace & media component scaffold (scaffold + docs only)
+
+**Why:** prepare the agent-side media experience locally, in mock mode, before any Dynamics 365 or
+Azure changes — so the UI and the UI↔ACS abstraction are validated and reviewable ahead of embedding.
+
+- `src/agent-media-panel/` (TypeScript + Vite): framework-neutral **agent media panel** with a strict
+  `IMediaSession` abstraction between the UI and the future ACS Calling SDK. Mock UI for join/leave,
+  mute, camera, screen share, recording status, consent status, participant roster, related
+  case/contact reference, and error/fallback messages. `RealMediaSession` is a documented placeholder
+  that throws until ACS is approved. Type-check verified. Runs locally on port 5190.
+- [ADR-0008](adr/0008-agent-media-component-approach.md): chose an **embedded web component first,
+  PCF-ready** approach (can be wrapped as PCF or hosted as a web resource later) and the rationale.
+- Documented **browser/iframe Permissions-Policy** considerations for camera/mic/screen-share when
+  embedded in the D365 host (README + known-limitations).
+- Deployment Assistant: added a **Power Platform solution import** note (later phase; includes the
+  agent media component; not available yet).
+- Updated architecture (§5.1), admin guide, known-limitations, and CHANGELOG.
+- **No Power Platform solution created/imported; PCF not registered/deployed; no Dataverse
+  tables/columns; no CIF v2 config; no real ACS tokens; no secrets stored.**
 
 ---
 

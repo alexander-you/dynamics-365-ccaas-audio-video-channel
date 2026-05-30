@@ -43,8 +43,7 @@ Close these with Microsoft (product group / FastTrack / account team) before pro
 
 1. Supported pattern to **attach a custom ACS media session to a routed work item**?
 2. Can a **custom ACS interaction consume agent capacity** via Unified Routing?
-3. Recommended approach to **embed ACS WebRTC inside the D365 workspace** (PCF/CIF iframe `getUserMedia`); required iframe/browser-policy config?
-4. Can **custom ACS recordings be consumed by D365 Quality Management**?
+3. Recommended approach to **embed ACS WebRTC inside the D365 workspace** (PCF/CIF iframe `getUserMedia`); required iframe/browser-policy config?4. Can **custom ACS recordings be consumed by D365 Quality Management**?
 5. **Which supervisor capabilities** (monitor/consult/barge) can be reused vs custom-built?
 6. **Licensing** for D365 Contact Center seats, ACS consumption, recording, Teams interop?
 7. Any **roadmap** for a standalone native video channel that could reduce custom scope?
@@ -82,3 +81,19 @@ conversation/case. **[Assumption — design later]**
   deployment is reviewable and repeatable.
 - RBAC deployment requires **Owner / User Access Administrator**; ACS data-plane roles still
   require **[Validate with Microsoft]**.
+
+## 8. Agent media component & browser/iframe permissions (Phase 3c — scaffold only)
+
+- The agent media panel under [`src/agent-media-panel`](../src/agent-media-panel/README.md) is a
+  **local, mock-mode** web component. It is **not registered or imported into Dynamics 365**, uses
+  **no real ACS tokens**, and creates no Dataverse/Power Platform artifacts.
+- The real implementation will use `getUserMedia` / `getDisplayMedia` and the ACS Calling SDK. When
+  embedded in the D365 workspace, media access depends on the hosting **iframe Permissions-Policy**
+  delegating `camera; microphone; display-capture; autoplay` over **HTTPS**. **[Validate with Microsoft]**
+- Whether the **PCF/CIF iframe** in Dynamics 365 permits `getUserMedia` / `getDisplayMedia`, and the
+  exact `allow` / CSP configuration required, is an **open validation item** (also listed in §3).
+  **[Validate with Microsoft]**
+- **Screen sharing (`getDisplayMedia`)** may be restricted inside cross-origin iframes and requires a
+  user gesture; co-browsing remains a separate future capability (§6). **[Assumption — validate]**
+- The choice of **PCF control vs web resource** for the eventual embedding is recorded in
+  [ADR-0008](adr/0008-agent-media-component-approach.md) and is finalized in a later phase.

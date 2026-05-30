@@ -1,0 +1,21 @@
+{
+  "name": "acv-agent-media-panel",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agent-side ACS media control scaffold for the Dynamics 365 agent workspace. Phase 3c — local-only, mock mode. NOT registered/deployed to Dynamics 365.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@azure/communication-calling": "^1.31.1",
+    "@azure/communication-common": "^2.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}
