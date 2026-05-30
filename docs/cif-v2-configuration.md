@@ -151,3 +151,64 @@ Framework** app / `msdyn_*` provider tables) with these proposed values:
 - Presence/session APIs availability depends on the workspace app edition and configuration.
   **[Validate in target environment]**
 - Outbound and analytics are out of scope for the POC.
+
+---
+
+## 10. Live in-panel video (real ACS) — embed wiring
+
+This section makes the embedded CIF widget show **real ACS video inside the Communication Panel**,
+not just the mock widget. The **code** for this is implemented and ships in the hosted panel; the
+remaining work is the **Channel Provider registration** below.
+
+### 10.1 How the single hosted build runs live (no second build)
+
+The panel selects mock vs. real **at runtime** so the same GitHub Pages build can stay safe on its
+bare URL and go live only when embedded:
+
+- `createMediaSession(ctx)` returns the **real** `RealMediaSession` when **either** the build sets
+  `VITE_USE_MOCKS=false` **or** the resolved context says **`mode=live`**. Opening the bare URL with
+  no params keeps the default `mode=mock` → local mock (no ACS, no camera/mic prompt).
+- `acsGroupId` is read from the URL query / CIF custom params and, when present, the agent joins
+  **that exact ACS group** — the same group the customer entry point joined. With no `acsGroupId`
+  it falls back to the build default GUID (`VITE_ACS_GROUP_ID`).
+- `main.ts` **auto-joins** the ACS group on load when the session is real, so the agent's video
+  appears in the panel without a manual click (`join()` is idempotent; controls still render).
+
+### 10.2 Channel Provider values for live video
+
+Same record as §1, with these changes:
+
+| Setting | Live value | Notes |
+|---|---|---|
+| **Channel URL** | `https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/?mode=live` | `mode=live` flips the widget to real ACS at runtime |
+| **Trusted domain** | `https://alexander-you.github.io` | Must be HTTPS and allow-listed |
+| **Custom Parameters** | `{ "mode": "live", "acsGroupId": "7a9f5c2e-0b1d-4e6a-9c3f-1a2b3c4d5e6f" }` | `mode=live` + the **same** group GUID the customer joins |
+
+> Either put `?mode=live` in the **Channel URL** *or* set `mode: "live"` in **Custom Parameters**
+> (`CifBridge.getContextOverrides()` merges custom params over the URL). Pin `acsGroupId` to the
+> shared POC group GUID so the agent and customer land in the same call.
+
+### 10.3 iframe media permissions (required for camera/mic)
+
+For `getUserMedia` to work inside the CIF iframe, the host frame must delegate media permissions via
+**Permissions-Policy / `allow`**: `camera; microphone; display-capture; autoplay`. If the embedding
+frame does not delegate these, the browser blocks the agent camera/mic and the call cannot publish
+media. This is the open validation item from §9 — confirm with Microsoft for the target workspace app.
+
+### 10.4 Registration steps (admin)
+
+1. Open the **Channel Integration Framework 2.0** app in the target environment.
+2. **New Channel Provider** with the values in §1 + §10.2 (Name, Unique name `alex_acvprovider_poc`,
+   Label `Audio/Video`, **Channel URL** with `?mode=live`, **Trusted domain**
+   `https://alexander-you.github.io`, **Custom Parameters** `{ "mode": "live", "acsGroupId": "<group GUID>" }`,
+   API version **2.0**, Channel order `0`).
+3. In the **app profile** (App Profile Manager) bound to the test workspace app, attach this provider
+   under **Channel providers**, and assign the profile to the test agent user(s) only.
+4. Sign in as the test agent on that app profile → the panel loads in the **Communication Panel**,
+   auto-joins the ACS group, and shows live agent + customer video once the customer joins the same
+   group from the customer-web page (also `mode=live`, same `acsGroupId`).
+
+> **Scope / safety:** this surfaces the widget and starts a real ACS call; it does **not** create a
+> workstream/queue/native conversation. The BYOC relay’s `/api/inbound` still provides the routed
+> messaging work item + context separately. Rollback: detach the provider from the app profile (or
+> change the Channel URL back to mock / drop `?mode=live`).

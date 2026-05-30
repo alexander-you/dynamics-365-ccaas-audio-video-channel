@@ -270,7 +270,9 @@ export class RealMediaSession implements IMediaSession {
 
   constructor(ctx: AvContext = readAvContext(), config: AcsConfig = readAcsConfig()) {
     this.ctx = ctx;
-    this.config = config;
+    // Per-conversation group correlation: when the relay/CIF supplies an acsGroupId, join that
+    // exact group (the same one the customer joined). Otherwise fall back to the build default.
+    this.config = ctx.acsGroupId ? { ...config, groupId: ctx.acsGroupId } : config;
     this.snapshot = this.initialSnapshot();
   }
 
@@ -580,8 +582,21 @@ function videoTile(target: HTMLElement, label: string): HTMLElement {
   return tile;
 }
 
-/** Factory honoring VITE_USE_MOCKS. Returns the real ACS session only when explicitly enabled. */
+/**
+ * Factory selecting the real ACS session vs the local mock.
+ *
+ * Real ACS is used when EITHER:
+ *   - the build sets VITE_USE_MOCKS=false (explicit live build), OR
+ *   - the resolved context says mode="live" (e.g. the BYOC relay marked the routed conversation
+ *     live and D365/CIF passes mode=live to the embedded widget).
+ *
+ * This lets a single mock-by-default hosted build (safe bare public URL) become a real in-panel
+ * video widget when embedded as a CIF v2 channel provider with `?mode=live`. Opening the bare URL
+ * with no params keeps mode="mock" (the default) → local mock, no ACS, no permissions prompt.
+ */
 export function createMediaSession(ctx: AvContext = readAvContext()): IMediaSession {
-  const useMocks = (import.meta.env.VITE_USE_MOCKS as string | undefined) !== "false";
-  return useMocks ? new MockMediaSession(ctx) : new RealMediaSession(ctx);
+  const forcedLiveBuild = (import.meta.env.VITE_USE_MOCKS as string | undefined) === "false";
+  const liveByContext = ctx.mode === "live";
+  const useReal = forcedLiveBuild || liveByContext;
+  return useReal ? new RealMediaSession(ctx) : new MockMediaSession(ctx);
 }
