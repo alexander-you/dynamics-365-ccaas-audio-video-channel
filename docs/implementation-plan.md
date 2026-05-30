@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> **Version:** 0.1.0 · **Current phase:** Phase 3.5 (deployment experience & Git alignment — **scaffold + docs only**).
+> **Version:** 0.1.0 · **Current phase:** Phase 3b (IaC & deployment automation — **scaffold + docs only**).
 > This file is the single source of truth for phase status, open tasks, and risks. Update it every
 > meaningful release.
 
@@ -11,7 +11,10 @@
 | 0 | Environment, access & readiness validation | ✅ Done | — |
 | 1 | Repository & project foundation | ✅ Done | — |
 | 2 | Azure foundation (plan only) | 🟡 Planning done — **awaiting provisioning approval** | 👤 Azure cost approval |
-| 3 | ACS token service + customer entry point | � Scaffolding done (mocks) — **awaiting Azure/ACS approval to wire real services** | 👤 Azure/ACS approval || 3.5 | Deployment experience & Git alignment | 🟡 Scaffold + docs done (deployment assistant preview) | — || 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
+| 3 | ACS token service + customer entry point | 🟡 Scaffolding done (mocks) — **awaiting Azure/ACS approval to wire real services** | 👤 Azure/ACS approval |
+| 3.5 | Deployment experience & Git alignment | ✅ Scaffold + docs done (deployment assistant preview) | — |
+| 3b | IaC & deployment automation scaffold | 🟡 Scaffold + docs done (Bicep/scripts, no provisioning) | 👤 Azure provisioning approval |
+| 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
 | 5 | Dynamics 365 / Dataverse configuration model | 🔲 Not started | 👤 D365 schema approval |
 | 6 | Dynamics workspace integration (CIF v2) | 🔲 Not started | 👤 D365 config approval |
 | 7 | Agent-side media experience (PCF/web) | 🔲 Not started | — |
@@ -80,6 +83,29 @@ being retrofitted around a developer-only setup.
 - `docs/azure-resources.md` §18: how the assistant guides resource creation (mapped to the plan).
 - `docs/admin-guide.md`: early section on the future admin setup experience.
 - **No real ACS/Dataverse/Storage calls; no Azure or Dynamics 365 changes.**
+
+---
+
+### Phase 3b — IaC & deployment automation scaffold (scaffold + docs only)
+
+**Why:** translate the approved resource plan into reviewable, repeatable Infrastructure-as-Code so
+a future approved deployment is one well-documented step instead of manual Portal clicking.
+
+- `infra/bicep/`: `main.bicep` entry point + modules (`monitoring`, `storage`, `key-vault`,
+  `communication-services`, `function-app`, `event-grid`, `rbac`) and `parameters/dev.example.bicepparam`
+  (placeholders only). Applies the naming convention and the documented RBAC model.
+  [`infra/README.md`](../infra/README.md) explains it is **scaffold-only / not deployed**.
+- `scripts/`: `generate-azure-plan.ps1` (prints `az` commands, never provisions; `-Execute`
+  intentionally refuses), `validate-prerequisites.ps1` (read-only local tool/version checks),
+  and `scripts/README.md`.
+- Deployment Assistant extended to also generate **example `az` CLI commands** (flagged read-only
+  vs state-changing), a **cost warning summary**, and a **pre-deployment approval checklist**, plus
+  an explicit "never commit to Git" list. Type-check verified.
+- Architecture note added distinguishing **screen sharing (MVP)** from **co-browsing (future custom
+  module)**; recorded in [architecture.md §9](architecture.md) and
+  [known-limitations.md §6](known-limitations.md).
+- **No Azure resources provisioned; no `az deployment` executed; no Dynamics 365 / Power Platform
+  changes; no real ACS/Dataverse/storage connections; `USE_MOCKS` stays `true`.**
 
 ---
 

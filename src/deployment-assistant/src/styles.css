@@ -220,6 +220,70 @@ pre.code {
   padding: 4px 0;
 }
 
+/* Phase 3b: generated az CLI commands, checklist, area badges. */
+.tag-warn {
+  background: var(--warn-bg, #fff4e5);
+  border-color: var(--warn-border, #e0a96d);
+  color: #b35900;
+}
+
+.tag-safe {
+  background: #eef7ee;
+  border-color: #bcd9bc;
+  color: var(--good, #2e7d32);
+}
+
+.cmd-block {
+  margin: 10px 0;
+}
+
+.cmd-desc {
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.checklist {
+  list-style: none;
+  padding: 0;
+}
+
+.checklist li {
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.area {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  background: #eef2f7;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.area-Azure {
+  background: #e8f0fe;
+  color: #1a56b3;
+}
+
+.area-Dynamics365 {
+  background: #f3e8fe;
+  color: #6b29b3;
+}
+
+.area-Security {
+  background: #fdeaea;
+  color: #b32020;
+}
+
+.area-Cost {
+  background: #fff4e5;
+  color: #b35900;
+}
+
 footer {
   margin-top: 24px;
   font-size: 0.85rem;

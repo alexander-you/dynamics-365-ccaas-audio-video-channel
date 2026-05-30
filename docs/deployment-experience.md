@@ -143,3 +143,25 @@ The assistant prepares — but does not execute — the Dynamics side:
 
 Until these are confirmed, the solution remains in scaffold/preview state and **nothing is
 provisioned**.
+
+## 9. Infrastructure as Code & helper scripts (Phase 3b — scaffold only)
+
+In addition to manual Portal steps and the Deployment Assistant, the repository now ships a
+**Bicep IaC scaffold** so an approved deployment can be one reviewable step:
+
+- [`infra/bicep/main.bicep`](../infra/bicep/main.bicep) composes modules for ACS, Function App,
+  storage, monitoring, Key Vault, Event Grid, and RBAC, using the documented naming convention.
+- [`infra/bicep/parameters/dev.example.bicepparam`](../infra/bicep/parameters/dev.example.bicepparam)
+  contains **placeholders only**. Copy it to a **git-ignored** `dev.bicepparam` and fill real
+  values locally before deploying.
+- [`scripts/generate-azure-plan.ps1`](../scripts/generate-azure-plan.ps1) **prints** the `az`
+  commands (resource group, what-if, deploy) for review — it never provisions.
+- [`scripts/validate-prerequisites.ps1`](../scripts/validate-prerequisites.ps1) performs **read-only**
+  local tool/version checks.
+
+The Deployment Assistant now also generates **example `az` CLI commands** (each flagged read-only
+vs state-changing), a **cost warning summary**, and a **pre-deployment approval checklist**.
+
+> **Nothing here is executed.** No Azure resources are provisioned, and no `az deployment` command
+> is run by this repository. See [`infra/README.md`](../infra/README.md) and
+> [`scripts/README.md`](../scripts/README.md).

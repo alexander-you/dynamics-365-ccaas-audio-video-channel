@@ -336,3 +336,29 @@ The assistant additionally:
 
 > The assistant never substitutes for the §15 approval gate. It makes the decisions visible and
 > repeatable; a human still approves cost, naming, and RBAC before anything is created.
+
+---
+
+## 19. Infrastructure as Code (Bicep scaffold — Phase 3b)
+
+This plan is now expressed as a **Bicep scaffold** under [`infra/`](../infra/README.md) so an
+approved deployment is reviewable and repeatable. **The scaffold is not deployed by the repository**
+and runs no `az deployment` command.
+
+| Module | File | Maps to |
+|---|---|---|
+| Entry point | [`infra/bicep/main.bicep`](../infra/bicep/main.bicep) | §11 naming + composition of all resources |
+| Monitoring | `modules/monitoring.bicep` | §8 App Insights + Log Analytics |
+| Storage | `modules/storage.bicep` | §6 Functions runtime + recordings BYOS |
+| Key Vault | `modules/key-vault.bicep` | §9 Key Vault (RBAC auth, no secrets stored) |
+| ACS | `modules/communication-services.bicep` | §4 Azure Communication Services |
+| Function App | `modules/function-app.bicep` | §5 Function App + §12 app settings template |
+| Event Grid | `modules/event-grid.bicep` | §7 system topic + subscription |
+| RBAC | `modules/rbac.bicep` | §10 Managed Identity role assignments |
+
+Parameters live in [`infra/bicep/parameters/dev.example.bicepparam`](../infra/bicep/parameters/dev.example.bicepparam)
+(**placeholders only**). The helper scripts under [`scripts/`](../scripts/README.md) print `az`
+commands and validate prerequisites without provisioning.
+
+> `USE_MOCKS` remains `true` in the Function App settings until the real service implementations are
+> built and approved. RBAC deployment requires **Owner / User Access Administrator**.

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3b IaC & deployment automation scaffold (scaffold + docs only)
+- `infra/bicep/`: Bicep scaffold — `main.bicep` entry point plus modules `monitoring`, `storage`,
+  `key-vault`, `communication-services`, `function-app`, `event-grid`, and `rbac`, applying the
+  documented naming convention and least-privilege RBAC model. `parameters/dev.example.bicepparam`
+  holds placeholders only. `infra/README.md` documents it as **scaffold-only / not deployed**.
+- `scripts/`: `generate-azure-plan.ps1` (prints `az` commands; never provisions; `-Execute`
+  intentionally refuses), `validate-prerequisites.ps1` (read-only local tool/version checks), and
+  `scripts/README.md`.
+- `src/deployment-assistant/`: extended the plan output with **example `az` CLI commands** (each
+  flagged read-only vs state-changing), a **cost warning summary**, a **pre-deployment approval
+  checklist**, and an explicit "never commit to Git" list — in both the HTML preview and the text
+  export. Type-check verified.
+- `docs/architecture.md` §9: new note distinguishing **screen sharing (MVP)** from **co-browsing
+  (future custom module)** with consent / masking / audit / Dataverse-linkage design notes.
+- `docs/known-limitations.md`: added co-browsing (future) and IaC/deployment-automation
+  (scaffold-only) sections.
+- `docs/azure-resources.md` §19: Bicep scaffold mapping. `docs/deployment-experience.md` §9 and
+  `docs/deployment-guide.md`: IaC usage. `docs/admin-guide.md`: provisioning via the scaffold.
+  `docs/security-and-compliance.md` §12: IaC security posture.
+- `docs/implementation-plan.md`: added **Phase 3b**; fixed the phase-status table.
+
+### Notes (Phase 3b)
+- **No Azure resources were provisioned; no `az deployment` was executed; no Dynamics 365 / Power
+  Platform changes were made; no real ACS/Dataverse/storage connections were opened.** `USE_MOCKS`
+  remains `true`. The scaffold is documentation-as-code for a future, approved deployment.
+
 ### Added — Phase 3.5 deployment experience & Git alignment (scaffold + docs only)
 - `src/deployment-assistant/`: local, static HTML wizard (TypeScript + Vite) that collects
   deployment inputs, validates them locally, warns against pasting secrets, and renders a

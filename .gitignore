@@ -19,6 +19,12 @@ docs/private/**
 !docs/private/*.template.md
 
 # ─────────────────────────────────────────────────────────────
+# Infrastructure as Code — real parameter files (keep only *.example.bicepparam)
+# ─────────────────────────────────────────────────────────────
+infra/bicep/parameters/*.bicepparam
+!infra/bicep/parameters/*.example.bicepparam
+
+# ─────────────────────────────────────────────────────────────
 # Node / front-end
 # ─────────────────────────────────────────────────────────────
 node_modules/

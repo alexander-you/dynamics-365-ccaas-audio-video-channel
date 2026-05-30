@@ -263,3 +263,117 @@ export function buildPlan(inputs: DeploymentInputs): DeploymentPlan {
 
   return { inputs, resources, rbac: RBAC_MODEL, appSettings };
 }
+
+// =====================================================================================
+// Phase 3b additions — example az CLI commands, approval checklist, cost summary.
+// All of the below is GENERATED TEXT for human review. Nothing here executes anything.
+// =====================================================================================
+
+/** A generated, copy-pasteable command line plus a description. Never auto-executed. */
+export interface GeneratedCommand {
+  description: string;
+  command: string;
+  /** True when running this command would create cost or change cloud state. */
+  changesState: boolean;
+}
+
+/**
+ * Build illustrative `az` CLI commands for the plan. These mirror the Bicep scaffold under
+ * /infra and the /scripts helpers. They are intended to be reviewed and run manually by an
+ * administrator AFTER approval — the assistant never runs them.
+ */
+export function buildAzCliCommands(inputs: DeploymentInputs): GeneratedCommand[] {
+  const rg = inputs.resourceGroup || n("rg", inputs);
+  const acsName = n("acs", inputs);
+  const env = inputs.environment;
+
+  const cmds: GeneratedCommand[] = [];
+
+  cmds.push({
+    description: "Select the target subscription (replace with your subscription).",
+    command: `az account set --subscription "<your-subscription-id>"`,
+    changesState: false
+  });
+
+  if (inputs.createResourceGroup) {
+    cmds.push({
+      description: "Create the resource group (admin action; creates state).",
+      command: `az group create --name ${rg} --location ${inputs.region}`,
+      changesState: true
+    });
+  }
+
+  cmds.push({
+    description: "Preview the full deployment with what-if (no changes are made).",
+    command:
+      `az deployment group what-if \\\n` +
+      `  --resource-group ${rg} \\\n` +
+      `  --template-file infra/bicep/main.bicep \\\n` +
+      `  --parameters infra/bicep/parameters/${env}.bicepparam`,
+    changesState: false
+  });
+
+  cmds.push({
+    description: "Deploy the infrastructure (ONLY after explicit approval; creates cost).",
+    command:
+      `az deployment group create \\\n` +
+      `  --resource-group ${rg} \\\n` +
+      `  --template-file infra/bicep/main.bicep \\\n` +
+      `  --parameters infra/bicep/parameters/${env}.bicepparam`,
+    changesState: true
+  });
+
+  cmds.push({
+    description: "Show the ACS endpoint after deployment (read-only).",
+    command: `az communication show --name ${acsName} --resource-group ${rg} --query "hostName" -o tsv`,
+    changesState: false
+  });
+
+  return cmds;
+}
+
+/** A single item in the pre-deployment approval checklist. */
+export interface ChecklistItem {
+  area: "Azure" | "Dynamics 365" | "Security" | "Cost";
+  text: string;
+}
+
+/** Approval checklist that must be confirmed before any real deployment. */
+export function buildApprovalChecklist(inputs: DeploymentInputs): ChecklistItem[] {
+  const items: ChecklistItem[] = [
+    { area: "Azure", text: "Subscription, resource group, region, and naming convention approved." },
+    { area: "Azure", text: "An Owner / User Access Administrator is available to assign RBAC roles." },
+    { area: "Cost", text: "Cost impact reviewed and accepted (ACS usage is the main driver)." },
+    { area: "Security", text: "No secrets, tenant IDs, or subscription IDs will be committed to Git." },
+    { area: "Security", text: "Key Vault will hold secret references; app settings contain no raw secrets." },
+    { area: "Dynamics 365", text: "Dynamics 365 environment, solution, publisher, and prefix confirmed (later phase)." },
+    { area: "Dynamics 365", text: "Power Platform solution import approved (later phase)." }
+  ];
+  if (inputs.enableRecordingByos) {
+    items.push({
+      area: "Security",
+      text: "Recording retention / lifecycle policy and consent handling reviewed for BYOS storage."
+    });
+  }
+  if (!inputs.useKeyVault) {
+    items.push({
+      area: "Security",
+      text: "Key Vault is DISABLED — confirm an alternative approved secret-handling approach."
+    });
+  }
+  return items;
+}
+
+/** A cost-impacting line for the cost warning summary. */
+export interface CostLine {
+  resource: string;
+  level: CostLevel;
+  note: string;
+}
+
+/** Build the cost warning summary from the plan's resources. */
+export function buildCostSummary(inputs: DeploymentInputs): CostLine[] {
+  return RESOURCE_CATALOG.filter((r) => (r.include ? r.include(inputs) : true))
+    .filter((r) => r.cost !== "none")
+    .map((r) => ({ resource: r.kind, level: r.cost, note: r.costNote }));
+}
