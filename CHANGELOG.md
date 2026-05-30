@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3c agent workspace & media component scaffold (scaffold + docs only)
+- `src/agent-media-panel/`: framework-neutral **agent media panel** (TypeScript + Vite) with a strict
+  `IMediaSession` abstraction between the UI and the future ACS Calling SDK. Mock UI for **join /
+  leave session, mute/unmute, camera on/off, screen sharing, recording status, consent status,
+  participant state, related case/contact reference, and error/fallback messages**.
+  `RealMediaSession` is a documented placeholder that throws until ACS is approved. Runs locally on
+  port 5190. Type-check verified.
+- `docs/adr/0008-agent-media-component-approach.md`: ADR choosing an **embedded web component first,
+  PCF-ready** approach (can later be wrapped as a PCF control or hosted as a web resource) with the
+  rationale; added to the ADR index.
+- `src/agent-media-panel/README.md`: local test instructions plus **browser/iframe Permissions-Policy**
+  considerations for camera, microphone, and screen sharing when embedded in Dynamics 365.
+- `src/deployment-assistant/`: added a **Power Platform solution import** note (later phase; includes
+  the agent media component; not available yet) to both the HTML preview and text export.
+- `docs/architecture.md` §5.1, `docs/admin-guide.md` §1b, `docs/known-limitations.md` §8,
+  `docs/implementation-plan.md` (added Phase 3c) updated.
+
+### Notes (Phase 3c)
+- **No Power Platform solution was created or imported; the PCF control was not registered or deployed
+  to Dynamics 365; no Dataverse tables/columns were created; no CIF v2 configuration; no real ACS
+  tokens were used; no secrets were stored.** The component is a local mock-mode scaffold only.
+
 ### Added — Phase 3b IaC & deployment automation scaffold (scaffold + docs only)
 - `infra/bicep/`: Bicep scaffold — `main.bicep` entry point plus modules `monitoring`, `storage`,
   `key-vault`, `communication-services`, `function-app`, `event-grid`, and `rbac`, applying the

@@ -172,7 +172,21 @@ export function renderPlan(plan: DeploymentPlan): string {
       <li>🔒 Any secret value — use Key Vault references instead.</li>
     </ul>
 
-    <h3>11. Next steps</h3>
+    <h3>11. Power Platform solution import (later phase — not yet available)</h3>
+    <p class="muted">
+      The Azure side above is independent of Dynamics 365. The Dynamics-side configuration ships
+      later as a <strong>Power Platform solution</strong> (managed for deploy, unmanaged for dev).
+    </p>
+    <ul class="gates">
+      <li>📦 The solution will include the <strong>agent media component</strong> (PCF control or web
+        resource — see ADR-0008), CIF v2 channel provider configuration, and the Dataverse schema.</li>
+      <li>📦 Import requires a Dynamics 365 admin (System Customizer / System Administrator).</li>
+      <li>📦 Confirm the publisher and customization <strong>prefix</strong> before import.</li>
+      <li>✋ <strong>Not available yet.</strong> The agent media component currently exists only as a
+        local, mock-mode scaffold and is <strong>not</strong> registered or imported into Dynamics 365.</li>
+    </ul>
+
+    <h3>12. Next steps</h3>
     <ol>
       <li>Export this plan and review it with your Azure administrator.</li>
       <li>Provision resources via Portal (manual steps above) or the Bicep scaffold under <code>infra/</code> (after approval).</li>
@@ -228,5 +242,12 @@ export function renderPlanText(plan: DeploymentPlan): string {
   lines.push("Never commit to Git: subscription/tenant IDs, keys, connection strings, tokens,");
   lines.push("local.settings.json, .env.local, filled *.bicepparam, or any secret value.");
   lines.push("No deployment has been executed by this assistant.");
+  lines.push("");
+  lines.push("Power Platform solution import (LATER PHASE — not yet available):");
+  lines.push("  - The Dynamics-side config ships as a Power Platform solution (managed/unmanaged).");
+  lines.push("  - It will include the agent media component (PCF/web resource — ADR-0008), CIF v2");
+  lines.push("    channel provider config, and Dataverse schema. Requires a D365 admin to import.");
+  lines.push("  - Not available yet: the agent media component is a local mock-mode scaffold only");
+  lines.push("    and is NOT registered/imported into Dynamics 365.");
   return lines.join("\n");
 }

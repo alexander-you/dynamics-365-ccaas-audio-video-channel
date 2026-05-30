@@ -118,6 +118,22 @@ flowchart TD
   **custom PCF / web component** hosting the ACS Calling SDK. **[Confirmed]**
 - CIF v2 does **not** auto-create a native Omnichannel conversation or consume capacity. **[Confirmed — live]**
 
+### 5.1 Agent media component (scaffold — Phase 3c)
+
+The agent media controls are built as a **framework-neutral web component** with a strict
+abstraction boundary (`IMediaSession`) between the UI and the future ACS Calling SDK
+(`src/agent-media-panel/`). Phase 3c ships the **UI + abstraction in mock mode only** — it is
+**local-only and not registered or imported into Dynamics 365**.
+
+- The same UI and `IMediaSession` boundary can later be **wrapped as a PCF control** (`pac pcf init`)
+  or hosted as a **web resource** when embedding is approved — see
+  [ADR-0008](adr/0008-agent-media-component-approach.md).
+- `RealMediaSession` (ACS Calling SDK) is a documented placeholder that throws until ACS is approved.
+- Recording and consent are **server-authoritative** (token service + Event Grid); the panel renders
+  them, it does not own them.
+- Browser/iframe Permissions-Policy for camera/mic/screen-share in the D365 host is an open
+  validation item — see [known-limitations.md](known-limitations.md).
+
 See [known-limitations.md](known-limitations.md) for the full native-vs-custom matrix.
 
 ---

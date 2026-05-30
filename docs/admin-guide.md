@@ -31,6 +31,20 @@ so it is friendly to administrators, not only developers.
 > This section will expand with screenshots and step-by-step procedures as the real (non-preview)
 > deployment path is implemented.
 
+## 1b. Agent media component (scaffold — not yet in Dynamics 365)
+
+The agent-side media controls (mute, camera, screen share, recording/consent status, participant
+roster, related case/contact) are being built as a **custom component** that will later be embedded
+in the agent workspace.
+
+- Currently a **local, mock-mode scaffold** only (`src/agent-media-panel/`); it is **not registered
+  or imported into Dynamics 365** and uses **no real ACS tokens**.
+- It will later ship inside the **Power Platform solution** as a **PCF control or web resource**
+  (see [ADR-0008](adr/0008-agent-media-component-approach.md)) and be wired to CIF v2.
+- When embedded, the host **iframe must delegate browser media permissions**
+  (`allow="camera; microphone; display-capture; autoplay"`) over HTTPS; exact PCF/CIF behavior is an
+  open validation item (see [known-limitations.md](known-limitations.md)).
+
 ## 2. Configuration scope
 
 A configuration record can be scoped to (most specific wins): **channel instance → workstream →
