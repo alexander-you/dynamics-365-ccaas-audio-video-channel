@@ -186,3 +186,27 @@ Because the inbound path requires a credentialed channel **instance** that canno
 
 > Until this decision is made and C1b is satisfied, **no routed conversation can be created**. The
 > agent will not POST partial/broken Omnichannel provisioning via raw REST.
+
+### 6.5 Decision (2026-05-30): **PAUSED — pending Azure prerequisites**
+
+**Resolved:** proceed with **Path C-i (true BYOC)**, but it is **blocked** until Azure prerequisites
+exist. The Omnichannel **Add account** wizard for a custom channel requires a **Microsoft app ID**, a
+**Client secret**, a **Tenant ID**, and a **Callback endpoint** — i.e. an **Entra app registration** plus a
+**deployed callback/relay endpoint**. These are the **C4** deliverables, so the channel instance (C1b)
+cannot be created beforehand.
+
+| Item | Status |
+|---|---|
+| Path chosen | **C-i (true BYOC / Custom Messaging)** |
+| Blocking prerequisite | Azure **Entra app registration** (app ID + client secret + tenant ID) and a **deployed callback/relay endpoint** |
+| Record-based substitute (Path C-ii) | **Declined** for now (no new `alex_acvsession` table, no routing created yet) |
+| Current Option C state | **PAUSED — no routing/queue/capacity/channel-instance created** |
+
+**Resume trigger:** Azure app registration + relay endpoint approved and provisioned. Then execute in
+order: **C4** (stand up relay + register Entra app) → **C1b** (create the Custom Messaging channel
+instance using those credentials in the admin center) → **C1a** (script POC workstream/queue/routing/
+capacity) → **C2** (scripted inbound) → **C3** (panel reads context, launches **mock** media) → **C5**
+(real ACS, separate approval).
+
+> **No Dynamics 365 routing changes were made for Option C.** Provider/widget surfacing from Part 2
+> remains the only live custom-channel configuration; media remains mock.
