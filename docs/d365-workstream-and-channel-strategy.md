@@ -249,20 +249,27 @@ made until `live` is enabled. No real ACS media until **C5**.
 
 ### 6.7 C1b done (2026-05-30): Custom Messaging channel registered (Demo Contact Center EN)
 
-The channel was registered by **script** (Dataverse Web API + Microsoft Graph), confirming the §6.6
-correction that the admin-center wizard is not strictly required. **Media remains mock** — registering
-the channel does not create any conversation or start any media.
+The channel was first registered by **script** (Dataverse Web API + Microsoft Graph), confirming the §6.6
+correction that the admin-center wizard is not strictly required. It was subsequently **re-created via the
+admin-center "Custom channel setup" wizard** (bound directly to the messaging workstream), and the scripted
+duplicate was deleted so only the wizard-created channel remains. **Media remains mock** — registering the
+channel does not create any conversation or start any media.
 
 | Artifact | Value |
 |---|---|
-| Channel record (`msdyn_occustommessagingchannel`) | `dfcf46a6-575c-f111-a826-000d3a66fdf4`, name **ACS Audio/Video (POC)**, `msdyn_occustomchannelid=192350005` (MessagingAPI), **active** (`statecode=0`) |
+| Channel record (`msdyn_occustommessagingchannel`) — **keeper** | `e8e6253e-595c-f111-a826-000d3a66fdf4`, name **Visual Engagement Channel**, `msdyn_occustomchannelid=192350005` (MessagingAPI), **active** (`statecode=0`), wizard-created |
 | Webhook base URL | `https://func-acv-byoc-relay-vnusoc.azurewebsites.net/api` |
-| Managed identity record (`managedidentity`) | `f445feac-575c-f111-a826-000d3a66fdf4` (`credentialsource=2`, `subjectscope=1`), linked to the channel |
-| Entra federated credential | `oc-msg-webhook-fic` on app `acv-byoc-relay-poc` (issuer `https://login.microsoftonline.com/{tenant}/v2.0`, audience `api://AzureADTokenExchange`, subject = FICSubject from `GetComponentManagedIdentityFIC`) |
+| Managed identity record (`managedidentity`) | `ebe6253e-595c-f111-a826-000d3a66fdf4`, linked to the channel |
+| Entra federated credential | `oc-msg-webhook-fic` (id `3c1c52e1-c200-4bbf-aadf-da9b45850340`) on app `acv-byoc-relay-poc`, subject = FICSubject for the wizard channel (`…/h/dd0a79f3…`); issuer `https://login.microsoftonline.com/{tenant}/v2.0`, audience `api://AzureADTokenExchange` |
 | App ID URI | `api://fb888af4-ec8f-4eb2-b4c6-3e0037f56206` |
+| Tenant / App ID | `7dc4b2c8-5fab-4315-9ab1-70e4a1b69ccc` / `fb888af4-ec8f-4eb2-b4c6-3e0037f56206` |
+
+> **Deleted scripted duplicate:** channel `dfcf46a6-575c-f111-a826-000d3a66fdf4` and managed identity
+> `f445feac-575c-f111-a826-000d3a66fdf4` were removed; the `oc-msg-webhook-fic` federated credential was
+> repointed from the scripted subject to the wizard channel's FICSubject.
 
 > **FIC regeneration caveat:** any change to the channel's webhook configuration regenerates the
 > FICSubject — re-run `GetComponentManagedIdentityFIC` and update the Entra federated credential.
 
-**Rollback (C1b):** delete the `msdyn_occustommessagingchannel` and `managedidentity` records, and remove
-the `oc-msg-webhook-fic` federated credential. All reversible.
+**Rollback (C1b):** delete the wizard-created `msdyn_occustommessagingchannel` (`e8e6253e-…`) and its
+`managedidentity` (`ebe6253e-…`) records, and remove the `oc-msg-webhook-fic` federated credential. All reversible.
