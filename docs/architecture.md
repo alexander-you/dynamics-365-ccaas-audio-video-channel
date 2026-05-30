@@ -155,7 +155,35 @@ A detailed sequence will be documented in `session-lifecycle.md` during Phase 4.
 
 ---
 
-## 9. Open architectural questions
+## 9. Screen sharing vs co-browsing
+
+These are **two different capabilities** and are scoped differently:
+
+| Capability | In MVP? | Mechanism | Notes |
+| --- | --- | --- | --- |
+| **Screen sharing** | **Yes** | Native ACS Calling SDK screen-share (the participant streams a window/screen as video) | Already represented in the role/permission model (Presenter/Attendee). One party shares pixels; the other views. **[Confirmed]** |
+| **Co-browsing** | **No (future)** | A separate, custom DOM-synchronisation module | True co-browsing (shared, interactive control of the same web page with field-level masking) is **not** part of the MVP. |
+
+> **Co-browsing is intentionally out of MVP scope.** It should be documented and built later as a
+> **custom module**, not assumed to be provided by ACS screen sharing.
+
+### Future co-browsing design considerations (not implemented)
+
+When co-browsing is taken on as a future workstream, evaluate a real-time transport such as
+**Azure Web PubSub** or **Azure Fluid Relay** to synchronise DOM/scroll/input state between
+customer and agent. The design **must** include:
+
+- **Consent** captured and persisted (Dataverse) before a co-browse session starts.
+- **Field masking** of sensitive inputs (passwords, payment data, PII) on the shared surface.
+- **Audit trail** of who initiated, joined, and ended each co-browse session.
+- **Dataverse linkage** of the co-browse session to the conversation/case, consistent with the
+  recording/transcript metadata model.
+
+This is captured as a future item in [known-limitations.md](known-limitations.md).
+
+---
+
+## 10. Open architectural questions
 
 Tracked in [known-limitations.md](known-limitations.md) and [implementation-plan.md](implementation-plan.md):
 routed work-item attachment, capacity consumption, WebRTC-in-iframe support, Quality Management

@@ -60,3 +60,25 @@ supportability validation. These are first-class workstreams, not afterthoughts.
 - Omnichannel internal entity **logical names vary by version** — confirm in the target environment. **[Validate]**
 - **No built-in ACS geo-replication/DR** — disaster recovery is app-level. **[Confirmed]**
 - **No Microsoft reference architecture** exists for a custom ACS media channel — higher design risk. **[Confirmed — live (absence)]**
+
+## 6. Co-browsing (future, out of MVP scope)
+
+**Screen sharing is in the MVP** (native ACS Calling SDK). **True co-browsing is not.** Do not
+treat ACS screen sharing as co-browsing — they are different capabilities (see
+[architecture.md §9](architecture.md)).
+
+Co-browsing should be delivered later as a **custom module**, evaluated against a real-time
+transport such as **Azure Web PubSub** or **Azure Fluid Relay**, and must include **consent**,
+**field-level masking** of sensitive inputs, an **audit trail**, and **Dataverse linkage** to the
+conversation/case. **[Assumption — design later]**
+
+## 7. IaC / deployment automation (Phase 3b — scaffold only)
+
+- The Bicep templates under [`/infra`](../infra/README.md) and the helper scripts under
+  [`/scripts`](../scripts/README.md) are **scaffolding only**. **No Azure resources have been
+  provisioned**, and no `az deployment` command is run by this repository.
+- The real (non-mock) ACS, Dataverse, and storage service implementations are **not** included
+  yet; `USE_MOCKS` remains `true`. The IaC describes the target topology so a future approved
+  deployment is reviewable and repeatable.
+- RBAC deployment requires **Owner / User Access Administrator**; ACS data-plane roles still
+  require **[Validate with Microsoft]**.

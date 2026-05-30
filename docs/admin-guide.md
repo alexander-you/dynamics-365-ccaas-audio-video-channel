@@ -61,6 +61,20 @@ vs. a premium authenticated area).
 5. Configure the Unified Routing workstream/queue/skills (Phase 9).
 6. Validate with a test session (Phase 11).
 
+### Provisioning Azure with the Bicep scaffold (optional, after approval)
+
+Instead of clicking through the Portal, an admin can provision the Azure side from the
+**Bicep scaffold** under [`infra/`](../infra/README.md):
+
+1. Run `pwsh ./scripts/validate-prerequisites.ps1` (read-only tool check).
+2. Run `pwsh ./scripts/generate-azure-plan.ps1 ...` to **print** the `az` commands for review.
+3. Copy `infra/bicep/parameters/dev.example.bicepparam` to a **git-ignored** `dev.bicepparam`
+   and fill real values.
+4. Review with `az deployment group what-if`, then deploy with `az deployment group create`.
+
+> The repository never runs these commands automatically. RBAC deployment needs **Owner /
+> User Access Administrator**. `USE_MOCKS` stays `true` until real services are wired and approved.
+
 ## 5. What is native vs custom
 
 See [known-limitations.md](known-limitations.md). Admins should understand that routed-conversation,

@@ -88,8 +88,32 @@ Responses include `"isMock": true`; no real ACS call is placed.
 Follow the resource plan in [azure-resources.md](azure-resources.md) and the Deployment Assistant
 output. Resources: resource group, ACS, Function App, Functions runtime storage, recordings Blob
 (BYOS), Event Grid, Application Insights, Log Analytics, and (optionally) Key Vault. Provision via
-the Azure Portal (manual steps are listed per resource in the assistant) or via Infrastructure-as-Code
-(later phase). Assign the Function App's Managed Identity the roles shown in the RBAC model.
+the Azure Portal (manual steps are listed per resource in the assistant) or via the **Bicep IaC
+scaffold** under [`infra/`](../infra/README.md). Assign the Function App's Managed Identity the
+roles shown in the RBAC model.
+
+### Infrastructure as Code (Bicep scaffold)
+
+The `infra/bicep/` templates describe the full topology. To use them (after approval):
+
+```bash
+# 0) Verify local prerequisites (read-only, no Azure calls):
+pwsh ./scripts/validate-prerequisites.ps1
+
+# 1) Print the commands for review (nothing is executed):
+pwsh ./scripts/generate-azure-plan.ps1 -Prefix acv -Environment dev -Region westeurope -RegionShort weu
+
+# 2) Copy the example params to a git-ignored file and fill real values:
+Copy-Item infra/bicep/parameters/dev.example.bicepparam infra/bicep/parameters/dev.bicepparam
+
+# 3) Preview with what-if (no changes), then deploy ONLY after approval:
+az group create --name rg-acv-dev-weu --location westeurope
+az deployment group what-if --resource-group rg-acv-dev-weu --template-file infra/bicep/main.bicep --parameters infra/bicep/parameters/dev.bicepparam
+az deployment group create --resource-group rg-acv-dev-weu --template-file infra/bicep/main.bicep --parameters infra/bicep/parameters/dev.bicepparam
+```
+
+> The repository never runs these commands for you. The scaffold is documentation-as-code; the
+> `dev.bicepparam` you create is git-ignored and must never be committed.
 
 ## 5. Configure app settings (no secrets in source control)
 

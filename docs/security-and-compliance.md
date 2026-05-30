@@ -78,3 +78,21 @@
 - [x] Private docs store references only.
 - [ ] Pre-commit secret scanning (to add in a later phase).
 - [ ] CI secret scanning (to add in a later phase).
+
+## 12. IaC & deployment automation security (Phase 3b)
+
+The Bicep scaffold under [`infra/`](../infra/README.md) and scripts under
+[`scripts/`](../scripts/README.md) follow a **least-privilege, no-secrets** posture:
+
+- **No secrets in IaC.** Key Vault is created empty; secret values are added out-of-band by an
+  administrator and **never committed to Git**. App settings reference Key Vault, not raw secrets.
+- **Managed Identity first.** The Function App uses a system-assigned identity; `rbac.bicep` grants
+  only **Storage Blob Data Contributor** (recordings) and **Key Vault Secrets User**. ACS data-plane
+  roles still require **[Validate with Microsoft]**.
+- **No provisioning by automation.** Scripts only **print** `az` commands or run **read-only** local
+  checks; the repo runs no `az deployment`. `dev.bicepparam` (real values) is **git-ignored**.
+- **Storage hardening.** Templates set TLS 1.2 minimum, disable public blob access, and enable HTTPS
+  only. Production hardening (private endpoints, CMK, immutability, lifecycle) is documented but not
+  enabled in the scaffold.
+- **Never commit:** subscription/tenant IDs, connection strings, ACS keys, tokens,
+  `local.settings.json`, `.env.local`, or filled `*.bicepparam` files.
