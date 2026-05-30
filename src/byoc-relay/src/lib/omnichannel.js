@@ -7,13 +7,11 @@
 //   Headers:   Authorization: Bearer {token}
 //              channel-id: {custom_channel_id_guid}
 //              organization-id: {org_id_guid}
-//   Endpoints: POST /conversation/create        -> start a conversation
-//              POST /conversation/{id}           -> send message / typing / end
-//              GET  /conversations               -> list active conversations
-//              GET  /conversation/{id}/messages  -> retrieve messages
-//              GET  /conversation/{id}/context   -> fetch context
+//   Endpoints: POST /api/v1.0/consumer/conversation/create   -> start a conversation
+//              POST /api/v1.0/consumer/conversation/{id}      -> send message / typing / end
 //
 // Ref: https://learn.microsoft.com/en-us/dynamics365/contact-center/extend/intro-messaging-apis
+//      https://learn.microsoft.com/en-us/dynamics365/contact-center/extend/api/api-conversation-create
 //      https://learn.microsoft.com/en-us/dynamics365/contact-center/extend/configure-custom-messaging-channel
 //
 // This module is mock-aware: when RELAY_MODE !== 'live', no real token is acquired and
@@ -98,19 +96,27 @@ export async function createConversation({ customerName, avContext }, log) {
     return { conversationId, mode: 'mock' };
   }
 
-  const created = await call('/conversation/create', 'POST', {
-    channelData: { source: 'acv-byoc-relay', avContext: avContext || {} },
-    customer: { displayName: customerName || 'Audio/Video customer' },
+  // Map the A/V context into the Messaging API conversationcontext shape:
+  // each variable is { isDisplayable, value } and the value must be a string.
+  const conversationcontext = {};
+  for (const [key, raw] of Object.entries(avContext || {})) {
+    const value = typeof raw === 'string' ? raw : JSON.stringify(raw);
+    conversationcontext[key] = { isDisplayable: true, value };
+  }
+
+  const created = await call('/api/v1.0/consumer/conversation/create', 'POST', {
+    customercontext: {
+      preferredname: customerName || 'Audio/Video customer',
+    },
+    conversationcontext,
+    conversationrequestid: `acv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    startmessage: {
+      message: opening,
+      displayname: 'ACV Relay',
+    },
+    skipdeflectionbot: true,
   }, log);
 
   const conversationId = created.conversationId || created.id;
-  await call(`/conversation/${conversationId}`, 'POST', {
-    activity: {
-      type: 'message',
-      text: opening,
-      channelData: { avContext: avContext || {} },
-    },
-  }, log);
-
-  return { conversationId, mode: 'live' };
+  return { conversationId, mode: 'live', isNew: created.isNew };
 }
