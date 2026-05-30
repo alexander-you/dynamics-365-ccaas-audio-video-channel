@@ -1,0 +1,38 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+
+    "//": "------ ACS (placeholders only — NEVER commit real values) ------",
+    "ACS_ENDPOINT": "https://<your-acs-resource>.communication.azure.com",
+    "ACS_USE_MANAGED_IDENTITY": "true",
+    "//ACS_CONNECTION_STRING": "endpoint=https://...;accesskey=...  (use Key Vault ref; do not store here)",
+
+    "//": "------ Mock toggle: when true, no real ACS/Dataverse calls are made ------",
+    "USE_MOCKS": "true",
+
+    "//": "------ Token policy ------",
+    "TOKEN_TTL_MINUTES": "60",
+
+    "//": "------ Recordings storage (BYOS) ------",
+    "RECORDINGS_STORAGE_ACCOUNT": "<stacvrecdevweu01>",
+    "RECORDINGS_CONTAINER": "recordings",
+    "RECORDINGS_STORAGE_AUTH": "ManagedIdentity",
+    "RECORDING_STORAGE_MODE": "AzureBlobBYOS",
+
+    "//": "------ Key Vault ------",
+    "KEYVAULT_URI": "https://<kv-acv-dev-weu-01>.vault.azure.net/",
+
+    "//": "------ Dataverse (Phase 5 — leave blank until approved) ------",
+    "DATAVERSE_URL": "",
+    "DATAVERSE_AUTH": "ManagedIdentity",
+
+    "//": "------ CORS allow-list (comma-separated) ------",
+    "ALLOWED_ORIGINS": "http://localhost:5173"
+  },
+  "Host": {
+    "CORS": "http://localhost:5173",
+    "CORSCredentials": false
+  }
+}

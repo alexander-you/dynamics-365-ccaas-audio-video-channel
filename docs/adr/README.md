@@ -11,6 +11,8 @@ We use a lightweight ADR format. Each record has: Status, Context, Decision, Con
 | [0003](0003-cif-v2-as-workspace-integration.md) | CIF v2 as workspace integration, not media | Accepted |
 | [0004](0004-byos-recording-storage.md) | Bring-Your-Own-Storage for recordings | Accepted |
 | [0005](0005-repo-rooted-in-project-folder.md) | Git repository rooted in the project folder | Accepted |
+| [0006](0006-storage-responsibility-split.md) | Storage split — Dataverse for records, Blob for media | Accepted |
+| [0007](0007-functions-runtime-dotnet8-isolated.md) | Azure Functions runtime — .NET 8 isolated worker | Accepted |
 
 ## Template
 

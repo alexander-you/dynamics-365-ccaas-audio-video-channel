@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio &amp; Video Support — Connect</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>Connect with an agent</h1>
+        <p class="phase-badge">Phase 3 scaffold — mock mode (no real call is placed)</p>
+      </header>
+
+      <!-- Step 1: consent -->
+      <section id="consent-step" class="card">
+        <h2>Before we begin</h2>
+        <p id="consent-text" class="disclosure"></p>
+        <label class="checkbox">
+          <input type="checkbox" id="consent-checkbox" />
+          I understand and consent to this session being recorded.
+        </label>
+        <div class="actions">
+          <button id="consent-accept" disabled>Continue</button>
+          <button id="consent-decline" class="secondary">Decline</button>
+        </div>
+      </section>
+
+      <!-- Step 2: device checks -->
+      <section id="device-step" class="card hidden">
+        <h2>Camera &amp; microphone check</h2>
+        <video id="preview" autoplay muted playsinline></video>
+        <ul id="device-status" class="status-list"></ul>
+        <div class="actions">
+          <button id="device-recheck" class="secondary">Re-check devices</button>
+          <button id="join">Join session</button>
+        </div>
+      </section>
+
+      <!-- Step 3: in call -->
+      <section id="call-step" class="card hidden">
+        <h2>You are connected</h2>
+        <p id="call-status" class="status"></p>
+        <div class="actions">
+          <button id="toggle-mic" class="secondary">Mute</button>
+          <button id="toggle-cam" class="secondary">Stop video</button>
+          <button id="hangup" class="danger">Leave</button>
+        </div>
+      </section>
+
+      <p id="error" class="error hidden" role="alert"></p>
+    </main>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

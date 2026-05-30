@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> **Version:** 0.1.0 · **Current phase:** Phase 2 (Azure foundation — **planning only**).
+> **Version:** 0.1.0 · **Current phase:** Phase 3 (ACS token service + customer entry point — **scaffolding only, mocks**).
 > This file is the single source of truth for phase status, open tasks, and risks. Update it every
 > meaningful release.
 
@@ -11,7 +11,7 @@
 | 0 | Environment, access & readiness validation | ✅ Done | — |
 | 1 | Repository & project foundation | ✅ Done | — |
 | 2 | Azure foundation (plan only) | 🟡 Planning done — **awaiting provisioning approval** | 👤 Azure cost approval |
-| 3 | ACS token service + customer entry point | 🔲 Not started | — |
+| 3 | ACS token service + customer entry point | � Scaffolding done (mocks) — **awaiting Azure/ACS approval to wire real services** | 👤 Azure/ACS approval |
 | 4 | ACS Room / call session lifecycle | 🔲 Not started | — |
 | 5 | Dynamics 365 / Dataverse configuration model | 🔲 Not started | 👤 D365 schema approval |
 | 6 | Dynamics workspace integration (CIF v2) | 🔲 Not started | 👤 D365 config approval |
@@ -50,6 +50,17 @@ Legend: ✅ done · 🟡 in progress · 🔲 not started · 👤 requires user d
   considerations, and the explicit pre-provisioning approval gate.
 - Recorded proposed concrete names and pending decisions in `private/environments.md` (git-ignored).
 - **No Azure resources created, modified, or deleted.**
+
+### Phase 3 — ACS token service + customer entry point (scaffolding only)
+- `src/token-service/` (Azure Functions, .NET 8 isolated): mock-only endpoints `health`, `token`,
+  `session`, `consent`. Interfaces (`Abstractions/`) for ACS token issuance, session lifecycle,
+  consent capture, recording metadata, and Dataverse integration; mock implementations
+  (`Services/Mock/`). Build verified.
+- `src/customer-web/` (TypeScript + Vite): consent → device check → join → in-call flow in mock
+  mode (local preview only); `RealCallController` placeholder for the ACS Calling SDK. Type-check verified.
+- Placeholder config only (`local.settings.json.example`, `.env.example`) — no secrets/tenant values.
+- Added ADR-0006 (storage split) and ADR-0007 (.NET 8 isolated runtime).
+- **No real ACS/Dataverse/Storage calls; no Azure or Dynamics 365 changes.**
 
 ---
 

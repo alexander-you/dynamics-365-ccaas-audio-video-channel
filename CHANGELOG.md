@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Phase 3 scaffolding (code, no real service calls)
+- `src/token-service/`: Azure Functions project (.NET 8 isolated worker) with mock-only
+  implementations. HTTP endpoints: `GET /api/health`, `POST /api/token`, `POST /api/session`,
+  `POST /api/consent`. Clean interfaces in `Abstractions/` for issuing ACS tokens
+  (`IAcsTokenService`), creating/joining sessions (`IAcsSessionService`), capturing consent
+  (`IConsentStore`), preparing recording metadata (`IRecordingMetadataStore`), and future
+  Dataverse integration (`IDataverseClient`). Phase 3 ships mocks (`Services/Mock/`):
+  `MockAcsTokenService`, `MockAcsSessionService`, `InMemoryConsentStore`,
+  `InMemoryRecordingMetadataStore`, `NullDataverseClient` (`IsConfigured=false`). Build verified.
+- `src/customer-web/`: TypeScript + Vite customer entry point covering consent → device check →
+  join → in-call controls. Runs in mock mode (local preview only) with a `RealCallController`
+  placeholder for the ACS Calling SDK. Type-check verified.
+- `local.settings.json.example` (token service) and `.env.example` (web) with **placeholders
+  only** — no secrets, endpoints, keys, or tenant values.
+- README files for both projects with local development and smoke-test instructions.
+- ADR-0006 (storage responsibility split: Dataverse for metadata, Blob BYOS for media) and
+  ADR-0007 (.NET 8 isolated worker for Functions).
+
+### Changed — Phase 3
+- `docs/configuration-model.md`: added a system-of-record split section; renamed
+  `alex_storagemode` to `alex_recordingstoragemode` (default `AzureBlobBYOS`); enriched
+  `alex_acvrecording` with `alex_storagemode`, `alex_bloburi`, `alex_blobcredentialref`.
+- `docs/azure-resources.md` §6.2: recordings Blob storage (BYOS) is part of the MVP from day one.
+
+### Notes
+- **No real ACS, Dataverse, or Storage calls.** All implementations are mocks/placeholders.
+  `USE_MOCKS` defaults to `true`; the token service fails fast if set to `false`.
+- **No Azure resources and no Dynamics 365 changes were made.**
+
+### Planned
+- Phase 4+: real ACS Rooms/Call Automation, recording to Blob (BYOS), Dataverse integration.
+
 ### Added — Phase 2 planning (documentation only)
 - `docs/azure-resources.md`: proposed Azure resource plan covering resource group, region guidance,
   ACS / Function App / storage (functions + recordings BYOS) / blob container / Event Grid /
