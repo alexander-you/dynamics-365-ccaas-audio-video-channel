@@ -165,11 +165,11 @@ flowchart LR
 | Gate | Action | Scriptable & reversible? | Approval |
 |---|---|---|---|
 | **C0** | Lock this design + record discovery (this section) | Yes (docs only) | ✅ done |
-| **C1a** | Create POC **messaging workstream** (record), POC **queue**, **routing rule**, **capacity profile**; bind to the existing Custom channel definition | Mostly yes (Dataverse records) | needs go |
-| **C1b** | Create the **Custom Messaging channel instance** (credentials + inbound endpoint) | **No — Omnichannel admin center UI** | needs go |
-| **C2** | **Scripted inbound**: call the inbound messaging API with a mock A/V context to create a routed conversation | Yes (once C1b exists) | needs go |
+| **C4** | Stand up **Azure relay** (Entra app + Function App) + deploy relay code | Azure provisioning | ✅ done |
+| **C1b** | Register the **Custom Messaging channel** record (credentials + webhook) + managed-identity FIC auth | Yes (Dataverse + Graph) | ✅ done |
+| **C1a** | Create POC **messaging workstream** (record), POC **queue**, **routing rule**, **capacity profile**; bind to the channel | Mostly yes (Dataverse records) | needs go |
+| **C2** | **Scripted inbound**: call the inbound messaging API with a mock A/V context to create a routed conversation | Yes (once C1a exists) | needs go |
 | **C3** | On accept, panel reads conversation context and launches the **mock** media session; validate end-to-end | Yes | needs go |
-| **C4** | Replace scripted inbound with an **Azure Function relay** (inbound + required outbound webhook) | Azure provisioning | separate approval |
 | **C5** | Swap `MockMediaSession` → `RealMediaSession` (real ACS + token service) | Azure/ACS provisioning | separate approval |
 
 ### 6.4 Open decision (blocks C1b/C2)
@@ -246,3 +246,23 @@ made until `live` is enabled. No real ACS media until **C5**.
 > (FIC)** on the Entra app (subject from `GetComponentManagedIdentityFIC`). This supersedes the earlier
 > "not safely scriptable" note for the channel instance; C1b remains **needs-go** and will be done as a
 > deliberate, reversible step.
+
+### 6.7 C1b done (2026-05-30): Custom Messaging channel registered (Demo Contact Center EN)
+
+The channel was registered by **script** (Dataverse Web API + Microsoft Graph), confirming the §6.6
+correction that the admin-center wizard is not strictly required. **Media remains mock** — registering
+the channel does not create any conversation or start any media.
+
+| Artifact | Value |
+|---|---|
+| Channel record (`msdyn_occustommessagingchannel`) | `dfcf46a6-575c-f111-a826-000d3a66fdf4`, name **ACS Audio/Video (POC)**, `msdyn_occustomchannelid=192350005` (MessagingAPI), **active** (`statecode=0`) |
+| Webhook base URL | `https://func-acv-byoc-relay-vnusoc.azurewebsites.net/api` |
+| Managed identity record (`managedidentity`) | `f445feac-575c-f111-a826-000d3a66fdf4` (`credentialsource=2`, `subjectscope=1`), linked to the channel |
+| Entra federated credential | `oc-msg-webhook-fic` on app `acv-byoc-relay-poc` (issuer `https://login.microsoftonline.com/{tenant}/v2.0`, audience `api://AzureADTokenExchange`, subject = FICSubject from `GetComponentManagedIdentityFIC`) |
+| App ID URI | `api://fb888af4-ec8f-4eb2-b4c6-3e0037f56206` |
+
+> **FIC regeneration caveat:** any change to the channel's webhook configuration regenerates the
+> FICSubject — re-run `GetComponentManagedIdentityFIC` and update the Entra federated credential.
+
+**Rollback (C1b):** delete the `msdyn_occustommessagingchannel` and `managedidentity` records, and remove
+the `oc-msg-webhook-fic` federated credential. All reversible.
