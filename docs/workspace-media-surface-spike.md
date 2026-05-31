@@ -384,3 +384,82 @@ Invoke-RestMethod -Method Delete -Headers $h -Uri "$dv/api/data/v9.2/webresource
 
 The probe is **not** referenced by any site map, form, dashboard, ribbon, session template, or app
 profile, so deleting it changes no other behavior.
+
+## 12. PCF Media Host POC built (2026-05-31) — `alex_AcvMediaHost` / "Visual Engagement Media Host"
+
+> **Status:** the same-origin **PCF Media Host POC** (the §11 recommendation) was **scaffolded and
+> built locally**. Nothing was imported into the org, no routing/workstream/queue/capacity/template/
+> profile was changed, no Azure resource was provisioned, no Dataverse schema was created. The work is
+> entirely additive source under `pcf/` plus these doc updates, and is fully reversible by reverting
+> the commit. **Demo Contact Center HE untouched.**
+
+**Goal.** Replace the cross-origin third-party Application Tab media surface (proven unable to publish
+camera/mic) with a **same-origin Dynamics-hosted PCF** that runs the agent media engine in the host
+page DOM/origin, under the workspace page's own (permissive) Permissions-Policy proven in §11.
+
+**What was added (source only):**
+
+| Path | Purpose |
+|---|---|
+| [pcf/acv-media-host/AcvMediaHost/ControlManifest.Input.xml](../pcf/acv-media-host/AcvMediaHost/ControlManifest.Input.xml) | Control manifest. `external-service-usage` enabled for the relay host; properties `acsGroupId` (bound, optional — dynamic, empty = waiting), `contextId`, `tokenUrl`, `requestedMedia`, `mode` (all input/optional). No static group, no token/secret. |
+| [pcf/acv-media-host/AcvMediaHost/index.ts](../pcf/acv-media-host/AcvMediaHost/index.ts) | PCF lifecycle. `init` builds the DOM (status + video stage + controls + diagnostics), builds the engine config from inputs/URL/relay, instantiates the engine, subscribes, attaches the video stage and joins (or resolves `acsGroupId` via the relay `/api/session`, else waits). `updateView` re-reads a newly-resolved `acsGroupId`. `destroy` tears the call down. |
+| [pcf/acv-media-host/AcvMediaHost/media/mediaEngine.ts](../pcf/acv-media-host/AcvMediaHost/media/mediaEngine.ts) | The ACS Calling engine, faithfully adapted from the proven `RealMediaSession` (token → `AzureCommunicationTokenCredential` → `CallClient.createCallAgent` → acquire camera → `LocalVideoStream` → `join({ groupId }, { videoOptions })` → render local + remote via `VideoStreamRenderer` → cleanup). De-Vited: config comes from PCF inputs, not `import.meta.env`. |
+| [pcf/acv-media-host/AcvMediaHost/media/sessionResolver.ts](../pcf/acv-media-host/AcvMediaHost/media/sessionResolver.ts) | Resolves a dynamic `acsGroupId` from a context id (liveWorkItemId/conversationId/…) via the relay `/api/session`. Relay base derived from the configured `tokenUrl` (no hardcoded host). |
+| [pcf/acv-media-host/AcvMediaHost/media/pcfConfig.ts](../pcf/acv-media-host/AcvMediaHost/media/pcfConfig.ts) | Builds the engine config from PCF inputs → URL → defaults. |
+| [pcf/acv-media-host/AcvMediaHost/media/types.ts](../pcf/acv-media-host/AcvMediaHost/media/types.ts) | Self-contained engine types + the embedded-surface media diagnostics. |
+| [pcf/acv-media-host/AcvMediaHost/css/AcvMediaHost.css](../pcf/acv-media-host/AcvMediaHost/css/AcvMediaHost.css) | Scoped styling for the video stage / tiles / controls / diagnostics. |
+| [pcf/solution/](../pcf/solution/) | Dataverse solution wrapper (`pac solution init` + `add-reference`) that packages the control into a deployable zip for import. Unique name `alex_visual_engagement_media_host`, publisher prefix `alex`. **Production build now succeeds** (PCF `bundle.js` ~21 KiB, `solution.zip` ~11 KB). |
+| [pcf/acv-media-host/sdk-host/](../pcf/acv-media-host/sdk-host/) | Standalone, self-hosted ACS SDK bundle (`npm run build:sdk` → `dist/acv-acs-sdk.js`, ~5.15 MiB, git-ignored). Loaded by the control at runtime; see [its README](../pcf/acv-media-host/sdk-host/README.md). |
+
+**Build result — the POC proved that a PCF CANNOT *bundle* the ACS SDK, and then SOLVED it by loading the SDK at runtime. The component now packages cleanly.**
+
+| Check | Result |
+|---|---|
+| `npm run build` (pcf-scripts, **debug**) | **Succeeded** — 0 errors. (Debug does not enforce the size limit, so it was not decisive on its own.) |
+| ACS Calling SDK compiles (TypeScript, type-only) | **Yes** — `@azure/communication-calling` 1.43.1 + `@azure/communication-common` type-check; only **type-only** imports remain in the PCF (erased at compile), so the SDK is not in the component bundle. |
+| **Bundling the SDK into the PCF** | **IMPOSSIBLE.** Minified it is **5.5 MiB**, over PCF's hard **5 MB per-component limit** (`pcf-1045`), and code-splitting does **not** help — `pcf-scripts` forces `LimitChunkCountPlugin({ maxChunks: 1 })` (*"the PCF runtime cannot handle chunked bundles"*), so a dynamic `import()` is inlined back into the single bundle. |
+| **Fix — load the SDK at runtime from a hosted URL** | **WORKS.** The SDK is built separately into a standalone IIFE (`sdk-host/dist/acv-acs-sdk.js`, **5.15 MiB**, exposes `window.AcvAcs`) and loaded by the control via a `<script>` tag from a configurable `sdkUrl`. The PCF now ships only thin glue — **`bundle.js` = 21.4 KiB** — and **production/MSBuild packaging SUCCEEDS** (`solution.zip` produced). |
+| TypeScript lifecycle (`init`/`updateView`/`getOutputs`/`destroy`) | Compiles and is wired; `destroy` calls engine teardown (hangUp + dispose agent + dispose renderers). |
+| Web Workers / WASM | Bundled inside the standalone hosted SDK file (not the PCF); runtime behavior still pending the live test. |
+
+**Key finding — a PCF cannot *bundle* the ACS Calling SDK, but CAN load it at runtime.** The SDK ships as a
+single **~5.67 MB file**; minified into a PCF it is **5.5 MiB**, over the hard **5 MB single-bundle limit**
+(`pcf-1045`), and PCF forbids code-splitting (`maxChunks: 1`). The same >5 MB reality rules out a single
+raw web resource for the SDK. **Resolution:** the SDK is **not bundled** — it is built separately
+([`sdk-host/`](../pcf/acv-media-host/sdk-host/)) into one self-contained IIFE (~5.15 MiB, bundling
+`@azure/communication-calling` + `@azure/communication-common` + `@azure/logger`, so **no extra globals are
+needed**) and **loaded at runtime via a `<script>` tag** from a configurable `sdkUrl` (default: a same-origin
+web-resource path), reading `window.AcvAcs`. The PCF component bundle drops to **21.4 KiB** and packages
+cleanly. **Hosting choice (host the SDK file as a same-origin Dataverse web resource vs an allowlisted static
+host) and any cross-origin CSP `script-src` allowance remain a deployment decision**, but the architecture is
+proven and the artifact is now deployable. **This is the decisive result of the POC.**
+
+**What is validated vs still pending (post-impl gate):**
+
+| # | Question | Status |
+|---|---|---|
+| 1 | PCF builds successfully | **Yes** — both debug and **production/MSBuild** now succeed (`bundle.js` 21.4 KiB, `solution.zip` produced). The bundled-SDK design failed `pcf-1045`; the runtime-load design passes. |
+| 2 | Packages into a solution zip | **Yes** — `pcf/solution/bin/Release/solution.zip` (~11 KB). |
+| 3 | Loads inside Dynamics | **Pending** the user-gated import + host (architecture no longer blocks it). |
+| 4 | Camera/mic capture succeeds | **Pending** live test — but §11 already proved same-origin capture works on this surface. |
+| 5 | ACS Calling SDK initializes | **Pending** live test — SDK now loads at runtime from `sdkUrl` (`window.AcvAcs`). |
+| 6 | Agent publishes video | **Pending** live test. |
+| 7 | Customer sees agent video | **Pending** live test. |
+| 8 | Agent sees customer video | **Pending** live test. |
+| 9 | Runtime/bundle/worker/WASM/CSP/lifecycle issues | **Bundle issue RESOLVED** (SDK loaded at runtime; PCF bundle 21.4 KiB). Remaining runtime checks (worker/WASM/CSP `script-src` for the SDK host, destroy lifecycle) are part of the live test. |
+| 10 | Rollback | See below |
+
+**Remaining steps (user-gated — deployment + live validation):**
+
+1. **Build + host the SDK file:** `npm run build:sdk` → upload `sdk-host/dist/acv-acs-sdk.js` as a
+   same-origin Dataverse web resource (e.g. `alex_acv_acs_sdk`, the control's default `sdkUrl`) or to an
+   allowlisted static host (set `sdkUrl` / `?sdkUrl=`; if cross-origin, allow it in CSP `script-src`).
+2. Import the control into `alex_visual_engagement_channel`, add it to a **POC** host (custom page / test
+   form bound to `acsGroupId`) — additive, **not** a production template/profile.
+3. Run the **live 2-way test** (agent ↔ customer camera + audio) and fill points 4–8 above.
+
+**Rollback (PCF POC):** delete the code component from `alex_visual_engagement_channel` (or delete the
+temporary `PowerAppsTools_*` solution if `pac pcf push` was used) and publish; remove any POC custom
+page / test form; `git revert` the commit (removes `pcf/` + these doc edits). Nothing else is touched —
+the Application Tab, relay, capture probe, routing, templates, and Demo Contact Center HE are all
+unaffected.

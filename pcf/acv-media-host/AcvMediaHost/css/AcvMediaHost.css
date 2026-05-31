@@ -1,0 +1,144 @@
+/* Visual Engagement Media Host (alex_AcvMediaHost) — POC styling.
+   Self-contained, scoped under .acv-media-host so it cannot leak into the host workspace page. */
+
+.acv-media-host {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 240px;
+  box-sizing: border-box;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  color: #242424;
+}
+
+.acv-media-host .acv-status {
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: #f3f2f1;
+  border: 1px solid #e1dfdd;
+}
+
+.acv-media-host .acv-status.info {
+  background: #eff6fc;
+  border-color: #c7e0f4;
+}
+.acv-media-host .acv-status.warning {
+  background: #fff4ce;
+  border-color: #ffe49b;
+}
+.acv-media-host .acv-status.error {
+  background: #fde7e9;
+  border-color: #f1bbbe;
+}
+
+.acv-media-host .acv-status-hint {
+  display: block;
+  margin-top: 2px;
+  color: #605e5c;
+}
+
+.acv-media-host .acv-stage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 160px;
+  background: #201f1e;
+  border-radius: 6px;
+  padding: 8px;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.acv-media-host .acv-stage:empty::after {
+  content: "No video yet";
+  color: #a19f9d;
+  font-size: 12px;
+  align-self: center;
+}
+
+.acv-media-host .acv-tile {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 160px;
+  max-width: 100%;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.acv-media-host .acv-tile video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.acv-media-host .acv-tile-local {
+  border: 2px solid #0f6cbd;
+}
+
+.acv-media-host .acv-tile-label {
+  position: absolute;
+  bottom: 4px;
+  left: 6px;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.acv-media-host .acv-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.acv-media-host .acv-controls button {
+  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid #8a8886;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.acv-media-host .acv-controls button:hover {
+  background: #f3f2f1;
+}
+
+.acv-media-host .acv-controls button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.acv-media-host .acv-diag {
+  font-size: 11px;
+  color: #605e5c;
+}
+
+.acv-media-host .acv-diag summary {
+  cursor: pointer;
+}
+
+.acv-media-host .acv-diag table {
+  border-collapse: collapse;
+  margin-top: 4px;
+}
+
+.acv-media-host .acv-diag td {
+  padding: 1px 8px 1px 0;
+}
+
+.acv-media-host .acv-diag .ok {
+  color: #107c10;
+}
+.acv-media-host .acv-diag .bad {
+  color: #a4262c;
+}

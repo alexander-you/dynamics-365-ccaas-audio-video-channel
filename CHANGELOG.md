@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — PCF Media Host POC (`alex_AcvMediaHost`; build-validated, not imported)
+- `pcf/acv-media-host/`: a minimal **same-origin PCF media component** ("Visual Engagement Media Host")
+  that replaces the cross-origin third-party Application Tab as the camera/microphone publishing
+  surface. It runs the agent media engine in the host model-driven page's **own DOM/origin** (no
+  cross-origin iframe), under the workspace page's permissive Permissions-Policy proven by the §11
+  capture probe. Files: `AcvMediaHost/ControlManifest.Input.xml` (properties `acsGroupId` bound/optional
+  — dynamic, empty = waiting; `contextId`/`tokenUrl`/`requestedMedia`/`mode` input/optional;
+  `external-service-usage` enabled for the relay host; no static group, no token/secret in code),
+  `AcvMediaHost/index.ts` (PCF `init`/`updateView`/`getOutputs`/`destroy` lifecycle — builds the video
+  stage, resolves the dynamic `acsGroupId` from inputs/URL/relay `/api/session`, joins, renders, and
+  tears the call down on destroy), and `AcvMediaHost/media/{mediaEngine,sessionResolver,pcfConfig,types}.ts`
+  (the ACS Calling engine faithfully adapted from the proven `RealMediaSession`: token → join →
+  publish camera/mic → render local + remote via `VideoStreamRenderer` → cleanup; de-Vited so config
+  comes from PCF inputs, not `import.meta.env`), plus scoped `css/AcvMediaHost.css`.
+- `pcf/solution/`: a Dataverse solution wrapper (`pac solution init` + `add-reference`). Production
+  build **succeeds** — PCF `bundle.js` ~21 KiB, `solution.zip` ~11 KB (the SDK is loaded at runtime, not
+  bundled — see Notes below). Unique name `alex_visual_engagement_media_host`, publisher prefix `alex`.
+- `pcf/acv-media-host/sdk-host/`: the standalone self-hosted ACS SDK bundle (`npm run build:sdk` →
+  `dist/acv-acs-sdk.js`, ~5.15 MiB, git-ignored) that the control loads at runtime. See its README.
+- Updated `docs/workspace-media-surface-spike.md` (§12: PCF POC build result + the runtime-load
+  resolution + post-impl gate + rollback), `docs/known-limitations.md`
+  (§5a PCF finding), `docs/d365-agent-workspace-integration.md` (PCF finding), `docs/architecture.md`
+  (§5.1 media-surface decision).
+
+### Notes (PCF Media Host POC)
+- **Decisive finding + resolution — a PCF cannot *bundle* the ACS Calling SDK, but CAN load it at
+  runtime.** Bundling fails `pcf-1045` (minified ~5.5 MiB > the hard 5 MB per-component limit) and
+  code-splitting is impossible (`pcf-scripts` forces `LimitChunkCountPlugin({ maxChunks: 1 })`, *"the
+  PCF runtime cannot handle chunked bundles"*). **Fix:** the SDK is built separately
+  ([`pcf/acv-media-host/sdk-host`](pcf/acv-media-host/sdk-host)) into a standalone self-contained IIFE
+  (`acv-acs-sdk.js`, ~5.15 MiB, exposes `window.AcvAcs`, bundles `@azure/communication-calling` +
+  `-common` + `@azure/logger` so no extra globals are needed) and **loaded by the control at runtime**
+  via a `<script>` tag from a configurable `sdkUrl` input (default: a same-origin web-resource path).
+  With only **type-only** SDK imports left in the PCF, the component `bundle.js` is **21.4 KiB** and
+  **production/MSBuild packaging now SUCCEEDS** (`solution.zip` ~11 KB). Hosting the SDK file (same-origin
+  Dataverse web resource vs allowlisted static host + any cross-origin CSP `script-src`) is a deployment
+  choice, but the architecture is proven and the artifact is deployable.
+- **Nothing was imported into the org**, no routing/workstream/queue/capacity/session-template/app-
+  profile change, no Azure provisioning, no Dataverse schema. **No static `acsGroupId`; no hardcoded
+  conversation/contact/case ids, tokens, or tenant values; no secrets.** **Demo Contact Center HE
+  untouched.** Remaining (user-gated): build + host `acv-acs-sdk.js`, import into
+  `alex_visual_engagement_channel`, host the control on a POC
+  custom page / test form, and run the live 2-way agent↔customer call. Rollback = delete the code
+  component from the solution and publish (or delete the temp `PowerAppsTools_*` solution if
+  `pac pcf push` was used) + `git revert` the commit. The pop-out window remains **rejected**.
+
 ### Added — Same-origin capture probe web resource (Demo Contact Center EN; reversible)
 - `dataverse/webresources/alex_acv_capture_probe.html`: a minimal, self-contained HTML web resource
   (no external deps, no ACS, no Dataverse data calls, no storage/tokens/secrets) that reports origin /

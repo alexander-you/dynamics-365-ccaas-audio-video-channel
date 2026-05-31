@@ -136,6 +136,24 @@ abstraction boundary (`IMediaSession`) between the UI and the future ACS Calling
 - Browser/iframe Permissions-Policy for camera/mic/screen-share in the D365 host is an open
   validation item — see [known-limitations.md](known-limitations.md).
 
+> **Media-surface decision (2026-05-31).** Live testing + a same-origin capture probe established
+> that a **cross-origin** third-party Application Tab **cannot** publish camera/microphone (iframe
+> Permissions-Policy denies `getUserMedia`, `NotAllowedError`), while a **same-origin** Dynamics
+> surface — **including the model-driven app-shell content iframe** — **can** capture (probe SUCCESS,
+> local preview, no policy block). The **pop-out window is rejected** as the agent UX. The chosen path
+> is therefore a **same-origin Dynamics-hosted** media component that runs the engine in the host page
+> DOM/origin. A **PCF Media Host POC** (`alex_AcvMediaHost`, "Visual Engagement Media Host") was built
+> under [`pcf/acv-media-host`](../pcf/acv-media-host), wrapping the proven `RealMediaSession` engine.
+> **Finding + resolution: a PCF cannot *bundle* the ACS Calling SDK** (production packaging fails
+> `pcf-1045` — minified 5.5 MiB > the hard 5 MB limit — and the SDK, a single ~5.67 MB file, cannot be
+> code-split; `pcf-scripts` forces `maxChunks: 1`, *"the PCF runtime cannot handle chunked bundles"*).
+> **Resolved by loading the SDK at runtime:** it is built separately into a standalone self-contained
+> IIFE (`sdk-host/dist/acv-acs-sdk.js`, ~5.15 MiB, `window.AcvAcs`) and loaded via a `<script>` from a
+> configurable `sdkUrl`; the PCF component bundle is then **21.4 KiB** and **production packaging
+> succeeds** (`solution.zip`). The HTML web resource remains a proven diagnostic/fallback. See
+> [workspace-media-surface-spike.md §§11–12](workspace-media-surface-spike.md). **[Confirmed — same-origin
+> PCF + runtime-loaded ACS SDK packages cleanly; live runtime pending]**
+
 ### 5.2 Panel hosting model (POC vs. production)
 
 | Aspect | POC (current) | Target (production) |
