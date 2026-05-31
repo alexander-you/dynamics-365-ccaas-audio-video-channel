@@ -147,6 +147,58 @@ section {
   font-weight: 600;
 }
 
+.diag-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  margin: 8px 0;
+  font-size: 0.82rem;
+}
+
+.diag-grid dt {
+  color: var(--muted);
+}
+
+.diag-grid dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+.diag-ok {
+  color: var(--good);
+}
+
+.diag-bad {
+  color: var(--danger);
+}
+
+.diag-muted {
+  color: var(--muted);
+}
+
+.diag-err {
+  font-size: 0.8rem;
+  background: #fdeaea;
+  border: 1px solid #e6a3a3;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 6px 0;
+  word-break: break-word;
+}
+
+.diag-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--warn);
+  border: 1px solid #e0a96d;
+  background: #fff4e5;
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
 .amp-case dl {
   display: grid;
   grid-template-columns: 70px 1fr;

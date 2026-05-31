@@ -351,46 +351,38 @@ or replacement of, the Omnichannel conversation control.
 | Communication Panel | Native Omnichannel | Routed chat/messaging conversation (unchanged) |
 | Visual Engagement application tab | Custom (this project) | Hosted A/V panel joining the same ACS group as the customer |
 
-### 10.8 POC media-hosting pattern — embedded tab + top-level call window (2026-05-31)
+### 10.8 Pop-out call window — tested as a diagnostic, REJECTED as the product UX (2026-05-31)
 
-**Pattern:** *"D365 embedded tab for context and control, top-level pop-out window for
-camera/microphone publishing when iframe permissions block WebRTC capture."*
+> **Status: REJECTED.** A separate top-level browser pop-up is **not** an acceptable agent
+> experience and is **not** the target solution. The target UX is **native Omnichannel chat in the
+> Communication Panel + the Visual Engagement media experience INSIDE the Dynamics 365 workspace**.
+> The pop-out was implemented and tested **only as a diagnostic** to isolate where camera/microphone
+> publishing fails; it is now **hidden behind the `?debug=1` developer flag** and never shown to
+> agents by default. Do not build further around the pop-out model. See
+> [workspace-media-publishing-findings.md](workspace-media-publishing-findings.md).
 
-**Why:** the Visual Engagement application tab is a third-party-website iframe. In this environment
-that iframe is **not** delegated `allow="camera; microphone"` (see §10.3), so `getUserMedia` inside
-the tab is blocked by Permissions Policy. The embedded panel can still **receive** the customer's
-video (receiving does not require `getUserMedia`), but it **cannot publish** the agent camera/mic —
-which presented as a black "Agent" tile on the customer page. We cannot set the app-tab iframe's
-`allow` attribute (Dynamics controls it), so the agent publishes from a **top-level browser window**
-that has full camera/mic access.
+**What was tested (diagnostic only).** The agent panel could open the same hosted panel as a
+top-level window (`buildCallWindowUrl()` → `surface=tab&popout=1&acsGroupId=<guid>`, no static group,
+no token/secret on the URL) so we could confirm whether the embedded Dynamics app-tab iframe is what
+blocks WebRTC capture. This was a troubleshooting probe, not a shipped experience.
 
-**How it works**
+**Why it is rejected as UX.** A second floating browser window is a poor agent experience (window
+management, focus loss, separate camera/mic prompts, it can join as a **second** "Agent" endpoint so
+the customer may subscribe to the video-less embedded endpoint), and it contradicts the requirement
+that the Visual Engagement media experience stay inside the Dynamics workspace.
 
-| Surface | Role | Publishes camera/mic? |
-|---|---|---|
-| Embedded Dynamics app tab | Context, roster, consent, recording status, troubleshooting; receives customer video | No (iframe permissions block capture) |
-| Top-level **call window** (pop-out) | Joins the **same** dynamic ACS group; publishes agent camera + mic | Yes (top-level = full WebRTC capture) |
+**Current state in code.**
 
-- The embedded panel shows an **"Open call window"** button (`AgentPanel.renderCallWindow` /
-  `openCallWindow`). It detects it is embedded via `isEmbeddedIframe()` (`window.self !== window.top`).
-- The button opens the **same hosted panel URL** as a top-level window via `buildCallWindowUrl()`,
-  carrying the **same dynamic `acsGroupId`** (`surface=tab&popout=1&acsGroupId=<guid>`). **No static
-  group is ever used**, and **no token/secret is placed on the URL** — the pop-out mints its ACS token
-  at runtime from the relay `/api/token`.
-- The pop-out (top-level → `isEmbeddedIframe()` false) auto-joins the group (`surface=tab`) and
-  publishes camera + mic; it shows a "standalone call window" note instead of the button.
+- The pop-out button is **gated behind `isDebugMode()`** (`?debug=1`) in `AgentPanel.renderCallWindow`
+  and is labelled "debug only — not the product UX". Agents never see it in the normal experience.
+- The embedded panel now shows an in-tab **Media diagnostics** section instead (camera/mic permission,
+  `getUserMedia`, LocalVideoStream created, `startVideo`, local preview, video published, and the exact
+  browser / Permissions-Policy error) — `AgentPanel.renderDiagnostics` + `RealMediaSession.runDiagnostics`.
 
-**Fallback behavior (unchanged + extended)**
-
-- If camera publish fails inside the embedded tab, the panel shows a clear warning (NotAllowedError /
-  permissions-policy classified in `acquireCamera()`) with a hint to open the call window.
-- The **"Open call window"** button guides the agent to the publishing window.
-- If the browser **blocks the pop-up**, the panel shows instructions to allow pop-ups for the site and
-  click the button again (`openCallWindow` detects a null/closed window handle). Re-clicking re-focuses
-  an already-open call window instead of spawning a second endpoint.
-
-**Out of scope for this step (unchanged):** routing, queues, capacity, Dataverse schema, and Azure
-hosting are not modified. This step only adds the agent-side pop-out publishing surface.
+**Next:** understand and resolve camera/microphone publishing **inside** a supported Dynamics
+workspace surface (see the findings document). The pop-out remains only as a developer diagnostic
+unless Microsoft confirms there is no supported way to publish camera/mic from any embedded Dynamics
+workspace surface.
 
 
 #### 10.7.1 What was built (reversible POC)

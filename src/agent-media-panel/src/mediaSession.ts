@@ -17,10 +17,11 @@ import type {
   CaseContext,
   LocalMediaState,
   PanelMessage,
-  SessionState
+  SessionState,
+  MediaDiagnostics
 } from "./types";
 import type { AvContext } from "./context";
-import { readAvContext } from "./context";
+import { readAvContext, isEmbeddedIframe } from "./context";
 
 /** Events the session can emit to the UI. */
 export interface MediaSessionListener {
@@ -50,6 +51,10 @@ export interface IMediaSession {
   // the real ACS session draws local + remote video streams here. Passing an HTMLElement keeps ACS
   // renderer types from leaking through the interface.
   attachVideo?(stage: HTMLElement): void;
+
+  // Optional: probe camera/microphone capture on the current surface and refresh the snapshot's
+  // diagnostics. Implemented by the real ACS session; mock sessions omit it.
+  runDiagnostics?(): Promise<void>;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -271,6 +276,19 @@ export class RealMediaSession implements IMediaSession {
   private localVideoStream?: LocalVideoStream;
   private views: VideoStreamRendererView[] = [];
 
+  // Live media diagnostics for the embedded surface (see types.MediaDiagnostics). Mutated in place
+  // as the join/publish path runs; a copy is pushed into the snapshot via pushDiag().
+  private diag: MediaDiagnostics = {
+    embedded: isEmbeddedIframe(),
+    cameraPermission: "unknown",
+    microphonePermission: "unknown",
+    getUserMedia: "not-attempted",
+    localVideoStreamCreated: false,
+    startVideo: "not-attempted",
+    localPreviewRendered: false,
+    videoPublished: false
+  };
+
   constructor(ctx: AvContext = readAvContext(), config: AcsConfig = readAcsConfig()) {
     this.ctx = ctx;
     // Per-conversation group correlation: the relay/CIF supplies an acsGroupId (the same group the
@@ -301,6 +319,7 @@ export class RealMediaSession implements IMediaSession {
       requestedMedia: this.ctx.requestedMedia,
       sessionRef: this.ctx.sessionRef,
       acsGroupId: this.config.groupId,
+      diagnostics: { ...this.diag },
       message: this.hasSessionContext()
         ? {
             severity: "info",
@@ -329,6 +348,80 @@ export class RealMediaSession implements IMediaSession {
   private update(patch: Partial<SessionSnapshot>, message?: PanelMessage): void {
     this.snapshot = { ...this.snapshot, ...patch, message: message ?? this.snapshot.message };
     for (const l of this.listeners) l.onSnapshot(this.snapshot);
+  }
+
+  /** Push the current diagnostics into the snapshot so the panel re-renders the diagnostics grid. */
+  private pushDiag(): void {
+    this.update({ diagnostics: { ...this.diag } });
+  }
+
+  /** Best-effort camera/microphone permission lookup via the Permissions API (where supported). */
+  private async queryPermissions(): Promise<void> {
+    const perms = (navigator as Navigator & { permissions?: Permissions }).permissions;
+    if (!perms?.query) return;
+    const read = async (name: string): Promise<MediaDiagnostics["cameraPermission"]> => {
+      try {
+        // `camera`/`microphone` are not in the standard PermissionName union but are widely supported.
+        const status = await perms.query({ name: name as PermissionName });
+        return status.state as MediaDiagnostics["cameraPermission"];
+      } catch {
+        return "unknown";
+      }
+    };
+    this.diag.cameraPermission = await read("camera");
+    this.diag.microphonePermission = await read("microphone");
+  }
+
+  /** Classify a capture error: returns the exact message and any Permissions-Policy signal. */
+  private classifyCaptureError(err: unknown): { message: string; permissionsPolicy?: string } {
+    const name = err instanceof Error ? err.name : "";
+    const msg = err instanceof Error ? err.message : String(err);
+    const full = `${name}: ${msg}`.trim();
+    if (/permissions policy|permission policy|disallowed by permissions|feature is not enabled/i.test(full)) {
+      return { message: full, permissionsPolicy: full };
+    }
+    if (/NotAllowedError/i.test(full)) {
+      // NotAllowedError inside an iframe with no `allow="camera; microphone"` is the platform's
+      // Permissions-Policy block surfacing as a permission denial.
+      return {
+        message: full,
+        permissionsPolicy: this.diag.embedded
+          ? `${full} (likely the Dynamics app-tab iframe missing allow="camera; microphone")`
+          : undefined
+      };
+    }
+    return { message: full };
+  }
+
+  /**
+   * Probe camera/microphone capture on THIS surface and refresh diagnostics. Runs a direct
+   * getUserMedia attempt (then immediately stops the tracks) so we capture the exact browser /
+   * Permissions-Policy error the embedded Dynamics iframe produces, independent of the ACS SDK.
+   */
+  async runDiagnostics(): Promise<void> {
+    this.diag.embedded = isEmbeddedIframe();
+    await this.queryPermissions();
+    const media = navigator.mediaDevices;
+    if (!media?.getUserMedia) {
+      this.diag.getUserMedia = "failed";
+      this.diag.lastError = "navigator.mediaDevices.getUserMedia is unavailable on this surface.";
+      this.pushDiag();
+      return;
+    }
+    try {
+      const stream = await media.getUserMedia({ audio: true, video: true });
+      this.diag.getUserMedia = "success";
+      this.diag.lastError = undefined;
+      this.diag.permissionsPolicyError = undefined;
+      for (const t of stream.getTracks()) t.stop();
+    } catch (err) {
+      const { message, permissionsPolicy } = this.classifyCaptureError(err);
+      this.diag.getUserMedia = "failed";
+      this.diag.lastError = message;
+      this.diag.permissionsPolicyError = permissionsPolicy;
+    }
+    await this.queryPermissions();
+    this.pushDiag();
   }
 
   private async fetchToken(): Promise<TokenResponse> {
@@ -376,6 +469,7 @@ export class RealMediaSession implements IMediaSession {
         const { camera, error } = await this.acquireCamera();
         if (camera) {
           this.localVideoStream = new LocalVideoStream(camera);
+          this.diag.localVideoStreamCreated = true;
           localVideoStreams = [this.localVideoStream];
         } else {
           cameraError = error;
@@ -388,6 +482,9 @@ export class RealMediaSession implements IMediaSession {
       );
       this.wireCall(this.call);
       const publishedVideo = Boolean(this.localVideoStream);
+      this.diag.videoPublished = publishedVideo;
+      if (wantVideo) this.diag.startVideo = publishedVideo ? "success" : "failed";
+      this.pushDiag();
       this.update(
         { state: "connected", local: { ...this.snapshot.local, cameraOff: !wantVideo || !publishedVideo } },
         wantVideo && !publishedVideo
@@ -397,8 +494,8 @@ export class RealMediaSession implements IMediaSession {
                 "Connected to ACS group call (audio only) — your camera could not be published. " +
                 (cameraError ?? "No camera was available."),
               fallbackHint:
-                "If you are inside the Dynamics workspace tab, camera capture is often blocked by the " +
-                "embedded iframe's permissions policy. Open the panel in a separate browser window to publish video."
+                "Camera capture appears to be blocked on this embedded Dynamics surface. See the " +
+                "Media diagnostics below for the exact browser / Permissions-Policy error."
             }
           : { severity: "info", text: "Connected to ACS group call." }
       );
@@ -424,11 +521,21 @@ export class RealMediaSession implements IMediaSession {
    */
   private async acquireCamera(): Promise<{ camera?: VideoDeviceInfo; error?: string }> {
     if (!this.deviceManager) return { error: "Device manager unavailable." };
+    this.diag.embedded = isEmbeddedIframe();
     try {
       await this.deviceManager.askDevicePermission({ audio: true, video: true });
+      this.diag.getUserMedia = "success";
+      this.diag.lastError = undefined;
+      this.diag.permissionsPolicyError = undefined;
+      void this.queryPermissions().then(() => this.pushDiag());
     } catch (err) {
       const name = err instanceof Error ? err.name : "";
       const msg = err instanceof Error ? err.message : String(err);
+      const { message, permissionsPolicy } = this.classifyCaptureError(err);
+      this.diag.getUserMedia = "failed";
+      this.diag.lastError = message;
+      this.diag.permissionsPolicyError = permissionsPolicy;
+      void this.queryPermissions().then(() => this.pushDiag());
       if (/NotAllowedError|permission/i.test(`${name} ${msg}`)) {
         return {
           error:
@@ -544,19 +651,23 @@ export class RealMediaSession implements IMediaSession {
     if (this.call) {
       if (off) {
         if (this.localVideoStream) await this.call.stopVideo(this.localVideoStream);
+        this.diag.videoPublished = false;
+        this.pushDiag();
       } else {
         let camera = this.localVideoStream?.source;
         if (!camera) {
           const acquired = await this.acquireCamera();
           if (!acquired.camera) {
+            this.diag.startVideo = "failed";
+            this.pushDiag();
             this.update(
               { local: { ...this.snapshot.local, cameraOff: true } },
               {
                 severity: "warning",
                 text: `Camera could not be turned on. ${acquired.error ?? ""}`.trim(),
                 fallbackHint:
-                  "Inside the Dynamics workspace tab, camera capture is often blocked by the iframe " +
-                  "permissions policy. Open the panel in a separate browser window to publish video.",
+                  "Camera capture appears to be blocked on this embedded Dynamics surface. See the " +
+                  "Media diagnostics below for the exact browser / Permissions-Policy error.",
               }
             );
             this.refreshParticipants();
@@ -565,7 +676,18 @@ export class RealMediaSession implements IMediaSession {
           camera = acquired.camera;
         }
         this.localVideoStream = this.localVideoStream ?? new LocalVideoStream(camera);
-        await this.call.startVideo(this.localVideoStream);
+        this.diag.localVideoStreamCreated = true;
+        try {
+          await this.call.startVideo(this.localVideoStream);
+          this.diag.startVideo = "success";
+          this.diag.videoPublished = true;
+        } catch (err) {
+          const { message, permissionsPolicy } = this.classifyCaptureError(err);
+          this.diag.startVideo = "failed";
+          this.diag.lastError = message;
+          this.diag.permissionsPolicyError = permissionsPolicy ?? this.diag.permissionsPolicyError;
+        }
+        this.pushDiag();
       }
     }
     this.update({ local: { ...this.snapshot.local, cameraOff: off } });
@@ -614,6 +736,10 @@ export class RealMediaSession implements IMediaSession {
       const view = await renderer.createView();
       this.views.push(view);
       stage.appendChild(videoTile(view.target, "You (Agent)"));
+      if (!this.diag.localPreviewRendered) {
+        this.diag.localPreviewRendered = true;
+        this.pushDiag();
+      }
     } catch {
       /* rendering may fail if the stream stopped; ignore */
     }
