@@ -82,8 +82,13 @@ supportability validation. These are first-class workstreams, not afterthoughts.
   `alex_acv_capture_probe.html` was created in **Demo Contact Center EN** (solution
   `alex_visual_engagement_channel`) to empirically test whether a same-origin Dynamics surface gets
   document-level camera/microphone permission. No ACS, no Dataverse writes, no storage/tokens, not
-  bound to navigation or any template. **Live result pending** — see spike §11 for the test URLs,
-  result table, and one-step rollback. **[Validate — probe deployed, awaiting live run]**
+  bound to navigation or any template. **First live result (top-level, same-origin):** Permissions-
+  Policy **allows** camera + microphone, both permissions **granted**, and `getUserMedia` failed with
+  **`NotReadableError: Device in use`** — i.e. **device contention, _not_ a policy/`NotAllowedError`
+  block.** This is positive evidence that a same-origin Dynamics surface is **not** blocked at the
+  document-policy level (unlike the cross-origin app-tab). Still pending: a clean re-run with the camera
+  free (expect success) and the **app-shell (iframe) test**. See spike §11. **[Validate — probe
+  deployed, first read positive, app-shell read pending]**
 
 ## 6. Co-browsing (future, out of MVP scope)
 

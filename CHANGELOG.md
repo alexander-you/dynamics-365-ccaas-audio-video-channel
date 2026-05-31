@@ -25,9 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes (capture probe)
 - **Only one component was added: a single HTML web resource**, additive and unbound. No routing /
   workstream / queue / app-profile / session-template / capacity change, no Azure provisioning, no
-  navigation/template binding. **Demo Contact Center HE untouched.** The live camera/mic result is
-  **pending** the user's authenticated browser run. Rollback = delete the `webresourceset` record and
-  publish (see spike §11). The pop-out window remains **rejected** (kept only behind `?debug=1`).
+  navigation/template binding. **Demo Contact Center HE untouched.** **First live result (top-level,
+  same-origin):** Permissions-Policy allows camera + microphone, both permissions granted, and
+  `getUserMedia` failed with `NotReadableError: Device in use` = **device contention, not a policy
+  block** (positive evidence that same-origin Dynamics is not document-policy-blocked, unlike the
+  cross-origin app-tab). Pending a clean re-run with the camera free and the app-shell (iframe) test.
+  Rollback = delete the `webresourceset` record and publish (see spike §11). The pop-out window remains
+  **rejected** (kept only behind `?debug=1`).
 
 ### Added — Workspace media-surface feasibility spike (read-only; docs only)
 - `docs/workspace-media-surface-spike.md`: read-only spike evaluating which Dynamics 365 workspace

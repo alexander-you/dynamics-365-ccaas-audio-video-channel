@@ -304,21 +304,37 @@ a Permissions-Policy block is likely. It never calls ACS, Dataverse data APIs, s
 
 Click **Run capture test** in each and record the diagnostics.
 
-**RESULT: ⏳ awaiting live run.** The camera/microphone test requires a real device + user gesture in an
-authenticated browser session and cannot be executed headlessly. The values below are to be filled in
-from the live run:
+**RESULT (live run, 2026-05-31).** First live run completed for the **top-level** test (test 2). The
+camera/microphone test requires a real device + user gesture in an authenticated browser session and
+cannot be executed headlessly.
 
 | Diagnostic | App-shell (test 1) | Top-level (test 2) |
 |---|---|---|
-| Inside iframe | _tbd_ | _tbd_ |
-| Permissions-Policy allows camera | _tbd_ | _tbd_ |
-| Permissions-Policy allows microphone | _tbd_ | _tbd_ |
-| Camera permission | _tbd_ | _tbd_ |
-| Microphone permission | _tbd_ | _tbd_ |
-| getUserMedia | _tbd_ | _tbd_ |
-| Local preview created | _tbd_ | _tbd_ |
-| Permissions Policy blocking | _tbd_ | _tbd_ |
-| Exact error (name + message) | _tbd_ | _tbd_ |
+| Inside iframe | _tbd_ | **No** |
+| Permissions-Policy allows camera | _tbd_ | **Yes** |
+| Permissions-Policy allows microphone | _tbd_ | **Yes** |
+| Camera permission | _tbd_ | **granted** |
+| Microphone permission | _tbd_ | **granted** |
+| getUserMedia | _tbd_ | **FAILED** |
+| Local preview created | _tbd_ | **No** |
+| Permissions Policy blocking | _tbd_ | **No / inconclusive** |
+| Exact error (name + message) | _tbd_ | **`NotReadableError: Device in use`** |
+
+**Reading of the first result (decisive):** on the same-origin Dynamics origin, **Permissions-Policy
+allows camera + microphone**, both permissions are **granted**, and the failure was
+**`NotReadableError: Device in use`** — *not* `NotAllowedError` and *not* a Permissions-Policy block.
+`NotReadableError` means the OS/browser **could not open the hardware because another process already
+holds it** (e.g. a live ACS call in another tab/window, Teams, or another browser tab). This is
+**device contention, not a policy denial.** It is strong positive evidence that a **same-origin
+Dynamics surface is _not_ blocked from camera/microphone at the document-policy level** — the exact
+opposite of the cross-origin app-tab, which returned `NotAllowedError: Permission denied`.
+
+**Next two reads still needed to close this out:**
+1. **Re-run the top-level test with the camera free** (close any live call / other tab / Teams using
+   the camera) → expect `getUserMedia` to **succeed** and a local preview to render. This confirms the
+   `NotReadableError` was pure contention.
+2. **Run the app-shell test (test 1)** so the `Inside iframe = Yes` row is filled — this is the one
+   that mirrors the real embedded workspace document policy.
 
 **Interpretation rules (decided in advance, to avoid bias):**
 
