@@ -16,7 +16,7 @@ const DEFAULT_TOKEN_URL = "https://func-acv-byoc-relay-vnusoc.azurewebsites.net/
  * This is a relative, same-origin path by default — host acv-acs-sdk.js as a web resource (or any
  * allowlisted static host) and override via the sdkUrl PCF input / ?sdkUrl= query param. No secret.
  */
-const DEFAULT_SDK_URL = "/WebResources/alex_acv_acs_sdk";
+const DEFAULT_SDK_URL = "/WebResources/alex_acv_acs_sdk.js";
 
 function coerceMedia(value: string | null | undefined): RequestedMedia | undefined {
   if (!value) return undefined;
