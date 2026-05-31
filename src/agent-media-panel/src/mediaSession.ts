@@ -240,15 +240,17 @@ export interface AcsConfig {
   groupId: string;
 }
 
-const DEFAULT_GROUP_ID = "7a9f5c2e-0b1d-4e6a-9c3f-1a2b3c4d5e6f";
-
+// No static/hardcoded group id. The ACS group is resolved DYNAMICALLY per session from the relay /
+// CIF conversation context (acsGroupId on the URL query string or CIF custom params). There is no
+// fixed fallback group: if none is supplied the panel waits instead of joining an arbitrary call.
+// VITE_ACS_GROUP_ID is an optional LOCAL-DEV override only (never set in the hosted POC build).
 export function readAcsConfig(): AcsConfig {
   const env = import.meta.env as Record<string, string | undefined>;
   return {
     tokenUrl:
       env.VITE_TOKEN_URL ??
       "https://func-acv-byoc-relay-vnusoc.azurewebsites.net/api/token",
-    groupId: env.VITE_ACS_GROUP_ID ?? DEFAULT_GROUP_ID
+    groupId: env.VITE_ACS_GROUP_ID ?? ""
   };
 }
 
@@ -270,10 +272,17 @@ export class RealMediaSession implements IMediaSession {
 
   constructor(ctx: AvContext = readAvContext(), config: AcsConfig = readAcsConfig()) {
     this.ctx = ctx;
-    // Per-conversation group correlation: when the relay/CIF supplies an acsGroupId, join that
-    // exact group (the same one the customer joined). Otherwise fall back to the build default.
-    this.config = ctx.acsGroupId ? { ...config, groupId: ctx.acsGroupId } : config;
+    // Per-conversation group correlation: the relay/CIF supplies an acsGroupId (the same group the
+    // customer joined) via the conversation context. There is NO static fallback group — if none is
+    // present the resolved group is empty and the panel shows a waiting state instead of connecting.
+    const resolvedGroup = (ctx.acsGroupId || config.groupId || "").trim();
+    this.config = { ...config, groupId: resolvedGroup };
     this.snapshot = this.initialSnapshot();
+  }
+
+  /** True when a dynamic ACS session (acsGroupId) is available to join. */
+  private hasSessionContext(): boolean {
+    return this.config.groupId.trim() !== "";
   }
 
   private initialSnapshot(): SessionSnapshot {
@@ -290,10 +299,18 @@ export class RealMediaSession implements IMediaSession {
       mode: this.ctx.mode,
       requestedMedia: this.ctx.requestedMedia,
       sessionRef: this.ctx.sessionRef,
-      message: {
-        severity: "info",
-        text: `Live ACS — ${this.ctx.requestedMedia} interaction${refNote}. Joining group ${this.config.groupId}.`
-      }
+      message: this.hasSessionContext()
+        ? {
+            severity: "info",
+            text: `Live ACS — ${this.ctx.requestedMedia} interaction${refNote}. Joining group ${this.config.groupId}.`
+          }
+        : {
+            severity: "warning",
+            text:
+              "Waiting for an audio/video session. No session context (acsGroupId) is associated " +
+              "with this conversation yet — the call starts automatically once the relay/conversation " +
+              "provides one. No call is placed in the meantime."
+          }
     };
   }
 
@@ -326,6 +343,20 @@ export class RealMediaSession implements IMediaSession {
 
   async join(): Promise<void> {
     if (this.call) return;
+    // No static group: refuse to connect until a dynamic acsGroupId is available. Show a safe
+    // waiting state instead of joining an arbitrary/hardcoded group.
+    if (!this.hasSessionContext()) {
+      this.update(
+        { state: "idle" },
+        {
+          severity: "warning",
+          text:
+            "No audio/video session context (acsGroupId) is available yet. Waiting for the " +
+            "relay/conversation to supply one before connecting."
+        }
+      );
+      return;
+    }
     this.update({ state: "joining" }, { severity: "info", text: "Acquiring ACS token…" });
     try {
       const { token } = await this.fetchToken();

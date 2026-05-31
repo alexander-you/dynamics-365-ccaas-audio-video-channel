@@ -24,7 +24,11 @@ export interface AvContext {
   requestedMedia: RequestedMedia;
   /** Correlation reference from the relay (conversationrequestid / sessionRef). */
   sessionRef: string;
-  /** ACS group-call GUID to join. The customer entry point joins the same group. Empty = use build default. */
+  /**
+   * ACS group-call GUID to join, resolved dynamically per session from the relay/CIF conversation
+   * context. The customer entry point joins the same group. Empty = no session context yet → the
+   * live panel shows a waiting state and does NOT start a call (there is no static fallback group).
+   */
   acsGroupId: string;
   caseNumber: string;
   caseTitle: string;
