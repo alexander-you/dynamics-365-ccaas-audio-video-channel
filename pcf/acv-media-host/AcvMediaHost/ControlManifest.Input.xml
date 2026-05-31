@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <!--
+    Visual Engagement Media Host (alex_AcvMediaHost) — same-origin PCF media surface POC.
+
+    WHY THIS CONTROL EXISTS:
+      Live diagnostics proved a cross-origin third-party Application Tab cannot publish
+      camera/microphone (NotAllowedError / Permissions-Policy), while a SAME-ORIGIN Dynamics
+      surface (including the model-driven app-shell content iframe) captures successfully. This
+      PCF hosts the agent media engine IN the host page DOM/origin so getUserMedia + the ACS
+      Calling SDK run under the workspace page's own (permissive) Permissions-Policy.
+
+    SCOPE: POC validation only. No recording/transcription/supervisor, no routing/queue/capacity,
+      no full Dataverse schema. No static acsGroupId, no hardcoded tokens/ids/tenant values.
+  -->
+  <control namespace="AcvVisualEngagement"
+           constructor="AcvMediaHost"
+           version="0.0.1"
+           display-name-key="Visual Engagement Media Host"
+           description-key="Same-origin agent media host (ACS audio/video) for the Dynamics 365 workspace. POC."
+           control-type="standard">
+
+    <!--
+      External services: the control fetches a VoIP token from the BYOC relay and connects to
+      Azure Communication Services. Declared so the control is correctly classified.
+    -->
+    <external-service-usage enabled="true">
+      <domain>func-acv-byoc-relay-vnusoc.azurewebsites.net</domain>
+    </external-service-usage>
+
+    <!--
+      acsGroupId (bound): the dynamic ACS group-call GUID for THIS session (same group the
+      customer joined). Bound so it can be wired to a text column on a POC host form, OR set in
+      the test harness. NEVER a static/hardcoded group — empty => the control shows a waiting
+      state and does not connect.
+    -->
+    <property name="acsGroupId"
+              display-name-key="ACS group id (dynamic)"
+              description-key="Dynamic ACS group-call GUID for this session. Empty = waiting (no static group)."
+              of-type="SingleLine.Text"
+              usage="bound"
+              required="false" />
+
+    <!--
+      contextId (input): a platform conversation/session id (liveWorkItemId / conversationId /
+      convId / sessionId) that the control resolves to an acsGroupId via the relay /api/session.
+      Optional alternative to a directly-supplied acsGroupId.
+    -->
+    <property name="contextId"
+              display-name-key="Conversation/session id"
+              description-key="Platform conversation/session id resolved to an acsGroupId via the relay. Optional."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false" />
+
+    <!--
+      tokenUrl (input): the relay token endpoint that mints a server-side ACS VoIP token. Passed
+      in (not hardcoded in code) so no secret/tenant value is embedded in the bundle.
+    -->
+    <property name="tokenUrl"
+              display-name-key="Relay token URL"
+              description-key="Relay POST /api/token endpoint that mints a VoIP ACS token. No secret is stored in the control."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false" />
+
+    <!--
+      sdkUrl (input): URL of the standalone, self-hosted ACS SDK bundle (sdk-host/dist/acv-acs-sdk.js,
+      built via `npm run build:sdk`). The ACS Calling SDK CANNOT be bundled into a PCF (pcf-1045 / 5 MB
+      hard limit, no code-splitting), so it is loaded at runtime via a <script> tag from this URL and
+      read from the window.AcvAcs global. Host it as a web resource (same-origin) or an allowlisted
+      static host. Defaults to a same-origin web-resource path; override here or via ?sdkUrl=.
+    -->
+    <property name="sdkUrl"
+              display-name-key="ACS SDK URL (self-hosted)"
+              description-key="URL of the self-hosted standalone ACS SDK bundle, loaded at runtime. Defaults to a same-origin web-resource path. No secret."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false" />
+
+    <!--
+      requestedMedia (input): "audio-video" (default) or "audio". Drives whether the agent
+      publishes camera in addition to microphone.
+    -->
+    <property name="requestedMedia"
+              display-name-key="Requested media"
+              description-key="audio-video (default) or audio."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false" />
+
+    <!--
+      mode (input): "live" (default) or "mock". Display/diagnostic only.
+    -->
+    <property name="mode"
+              display-name-key="Mode"
+              description-key="live (default) or mock. Display only."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false" />
+
+    <resources>
+      <code path="index.ts" order="1" />
+      <css path="css/AcvMediaHost.css" order="1" />
+    </resources>
+  </control>
+</manifest>

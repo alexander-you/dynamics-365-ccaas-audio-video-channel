@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — PCF Media Host POC (`alex_AcvMediaHost`; build-validated, not imported)
+- `pcf/acv-media-host/`: a minimal **same-origin PCF media component** ("Visual Engagement Media Host")
+  that replaces the cross-origin third-party Application Tab as the camera/microphone publishing
+  surface. It runs the agent media engine in the host model-driven page's **own DOM/origin** (no
+  cross-origin iframe), under the workspace page's permissive Permissions-Policy proven by the §11
+  capture probe. Files: `AcvMediaHost/ControlManifest.Input.xml` (properties `acsGroupId` bound/optional
+  — dynamic, empty = waiting; `contextId`/`tokenUrl`/`requestedMedia`/`mode` input/optional;
+  `external-service-usage` enabled for the relay host; no static group, no token/secret in code),
+  `AcvMediaHost/index.ts` (PCF `init`/`updateView`/`getOutputs`/`destroy` lifecycle — builds the video
+  stage, resolves the dynamic `acsGroupId` from inputs/URL/relay `/api/session`, joins, renders, and
+  tears the call down on destroy), and `AcvMediaHost/media/{mediaEngine,sessionResolver,pcfConfig,types}.ts`
+  (the ACS Calling engine faithfully adapted from the proven `RealMediaSession`: token → join →
+  publish camera/mic → render local + remote via `VideoStreamRenderer` → cleanup; de-Vited so config
+  comes from PCF inputs, not `import.meta.env`), plus scoped `css/AcvMediaHost.css`.
+- `pcf/solution/`: a Dataverse solution wrapper (`pac solution init` + `add-reference`). Production
+  build **succeeds** — PCF `bundle.js` ~21 KiB, `solution.zip` ~11 KB (the SDK is loaded at runtime, not
+  bundled — see Notes below). Unique name `alex_visual_engagement_media_host`, publisher prefix `alex`.
+- `pcf/acv-media-host/sdk-host/`: the standalone self-hosted ACS SDK bundle (`npm run build:sdk` →
+  `dist/acv-acs-sdk.js`, ~5.15 MiB, git-ignored) that the control loads at runtime. See its README.
+- Updated `docs/workspace-media-surface-spike.md` (§12: PCF POC build result + the runtime-load
+  resolution + post-impl gate + rollback), `docs/known-limitations.md`
+  (§5a PCF finding), `docs/d365-agent-workspace-integration.md` (PCF finding), `docs/architecture.md`
+  (§5.1 media-surface decision).
+
+### Notes (PCF Media Host POC)
+- **Decisive finding + resolution — a PCF cannot *bundle* the ACS Calling SDK, but CAN load it at
+  runtime.** Bundling fails `pcf-1045` (minified ~5.5 MiB > the hard 5 MB per-component limit) and
+  code-splitting is impossible (`pcf-scripts` forces `LimitChunkCountPlugin({ maxChunks: 1 })`, *"the
+  PCF runtime cannot handle chunked bundles"*). **Fix:** the SDK is built separately
+  ([`pcf/acv-media-host/sdk-host`](pcf/acv-media-host/sdk-host)) into a standalone self-contained IIFE
+  (`acv-acs-sdk.js`, ~5.15 MiB, exposes `window.AcvAcs`, bundles `@azure/communication-calling` +
+  `-common` + `@azure/logger` so no extra globals are needed) and **loaded by the control at runtime**
+  via a `<script>` tag from a configurable `sdkUrl` input (default: a same-origin web-resource path).
+  With only **type-only** SDK imports left in the PCF, the component `bundle.js` is **21.4 KiB** and
+  **production/MSBuild packaging now SUCCEEDS** (`solution.zip` ~11 KB). Hosting the SDK file (same-origin
+  Dataverse web resource vs allowlisted static host + any cross-origin CSP `script-src`) is a deployment
+  choice, but the architecture is proven and the artifact is deployable.
+- **Nothing was imported into the org**, no routing/workstream/queue/capacity/session-template/app-
+  profile change, no Azure provisioning, no Dataverse schema. **No static `acsGroupId`; no hardcoded
+  conversation/contact/case ids, tokens, or tenant values; no secrets.** **Demo Contact Center HE
+  untouched.** Remaining (user-gated): build + host `acv-acs-sdk.js`, import into
+  `alex_visual_engagement_channel`, host the control on a POC
+  custom page / test form, and run the live 2-way agent↔customer call. Rollback = delete the code
+  component from the solution and publish (or delete the temp `PowerAppsTools_*` solution if
+  `pac pcf push` was used) + `git revert` the commit. The pop-out window remains **rejected**.
+
+### Added — Same-origin capture probe web resource (Demo Contact Center EN; reversible)
+- `dataverse/webresources/alex_acv_capture_probe.html`: a minimal, self-contained HTML web resource
+  (no external deps, no ACS, no Dataverse data calls, no storage/tokens/secrets) that reports origin /
+  iframe / "inside Dynamics" / secure-context / `featurePolicy.allowsFeature('camera'|'microphone')`,
+  queries `navigator.permissions` for camera/mic on load (no prompt), and on an explicit button click
+  runs one guarded `getUserMedia({video,audio})`, renders a local preview if possible, then **stops
+  all tracks immediately**. Surfaces getUserMedia success/failure, exact error name+message, and likely
+  Permissions-Policy block. Deployed (and published) to **Demo Contact Center EN** in solution
+  `alex_visual_engagement_channel` via `scripts/deploy-capture-probe.ps1`.
+- `scripts/deploy-capture-probe.ps1`: create/update + publish helper for the probe web resource
+  (az access token → upsert `webresourceset` with `MSCRM.SolutionUniqueName` → `PublishXml`).
+- Updated `docs/workspace-media-surface-spike.md` (new §11: probe deployed, two safe test URLs, result
+  table awaiting live run, decision rules, one-step rollback), `docs/known-limitations.md` (§5a probe-
+  deployed note), `docs/d365-agent-workspace-integration.md` (probe follow-up note).
+
+### Notes (capture probe)
+- **Only one component was added: a single HTML web resource**, additive and unbound. No routing /
+  workstream / queue / app-profile / session-template / capacity change, no Azure provisioning, no
+  navigation/template binding. **Demo Contact Center HE untouched.** **CONCLUSIVE result:** capture
+  succeeded **both** top-level **and inside the model-driven app-shell iframe** (`Inside iframe = Yes`,
+  parent = the Dynamics origin) — `getUserMedia({video,audio})` SUCCESS with a local preview, no policy
+  block. A same-origin / in-DOM Dynamics surface **can** capture camera/mic; the blocker was the
+  **cross-origin** third-party Application Tab (`NotAllowedError`). Live-validated publishing path = PCF
+  code component (or same-origin web resource / custom page); remaining validation is runtime +
+  Microsoft support, not permissions. Rollback = delete the `webresourceset` record and publish (see
+  spike §11). The pop-out window remains **rejected** (kept only behind `?debug=1`).
+
 ### Added — Workspace media-surface feasibility spike (read-only; docs only)
 - `docs/workspace-media-surface-spike.md`: read-only spike evaluating which Dynamics 365 workspace
   hosting surface can publish camera/microphone for ACS video. Confirms the cross-origin Application

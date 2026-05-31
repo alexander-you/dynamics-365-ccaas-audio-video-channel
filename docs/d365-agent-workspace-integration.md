@@ -71,6 +71,27 @@ profile** (not a production profile). The exact app and profile are confirmed be
 > page's document-level Permissions-Policy. The **pop-out window is rejected** as the agent UX (kept
 > only as a `?debug=1` diagnostic). This reorders the table below: a web resource / PCF is now the
 > media path, not merely an alternative.
+>
+> **Follow-up (2026-05-31) — same-origin probe deployed.** A minimal, unbound HTML web resource
+> `alex_acv_capture_probe.html` was created in **Demo Contact Center EN** (solution
+> `alex_visual_engagement_channel`) to empirically test whether a same-origin Dynamics surface gets
+> document-level camera/microphone permission. It runs a guarded `getUserMedia` that stops tracks
+> immediately, makes no ACS/Dataverse/storage/token calls, and is bound to nothing. **Live result is
+> pending** — see [workspace-media-surface-spike.md §11](workspace-media-surface-spike.md) for the two
+> safe test URLs (app-shell and top-level), the result table, and one-step rollback.
+>
+> **Result + next build (2026-05-31).** The probe returned **CONCLUSIVE**: a same-origin Dynamics
+> surface — **including the model-driven app-shell content iframe** — captures camera + microphone
+> (`getUserMedia` SUCCESS, local preview, no policy block). Only the **cross-origin** Application Tab is
+> blocked. Acting on this, a **PCF Media Host POC** (`alex_AcvMediaHost`, "Visual Engagement Media
+> Host") was built under [`pcf/acv-media-host`](../pcf/acv-media-host) wrapping the proven
+> `RealMediaSession` ACS engine. **Finding + resolution: a PCF cannot *bundle* the ACS Calling SDK**
+> (production packaging fails `pcf-1045` — minified 5.5 MiB > the hard 5 MB limit — and the SDK cannot be
+> code-split, `pcf-scripts` forces `maxChunks: 1`). **Resolved by loading the SDK at runtime:** it is
+> built separately into a standalone self-contained IIFE (`sdk-host/dist/acv-acs-sdk.js`, ~5.15 MiB,
+> `window.AcvAcs`) and loaded via a `<script>` from a configurable `sdkUrl`; the PCF bundle is then
+> 21.4 KiB and **production packaging succeeds**. Remaining (user-gated): host the SDK file + live
+> 2-way test. See [workspace-media-surface-spike.md §12](workspace-media-surface-spike.md).
 
 ### 3.1 The CIF v2 channel panel vs an app session tab
 

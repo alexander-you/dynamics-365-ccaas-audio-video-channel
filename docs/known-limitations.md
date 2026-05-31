@@ -78,6 +78,32 @@ supportability validation. These are first-class workstreams, not afterthoughts.
   page's own policy rather than a denied cross-origin delegation. Feasibility is a **grounded
   hypothesis pending a same-origin probe + Microsoft validation** — see
   [workspace-media-surface-spike.md](workspace-media-surface-spike.md). **[Validate]**
+- **Same-origin capture probe DEPLOYED (2026-05-31):** a minimal, unbound HTML web resource
+  `alex_acv_capture_probe.html` was created in **Demo Contact Center EN** (solution
+  `alex_visual_engagement_channel`) to empirically test whether a same-origin Dynamics surface gets
+  document-level camera/microphone permission. No ACS, no Dataverse writes, no storage/tokens, not
+  bound to navigation or any template. **CONCLUSIVE result (2026-05-31):** capture succeeded **both**
+  top-level **and inside the model-driven app-shell iframe** (`Inside iframe = Yes`, `Parent origin =`
+  the Dynamics origin) — Permissions-Policy allows camera + microphone, permissions granted,
+  `getUserMedia({video,audio})` **SUCCESS** with a local preview. A same-origin / in-DOM Dynamics
+  surface (incl. the app's own content iframe) **can** capture camera/mic; the blocker was specifically
+  the **cross-origin** third-party Application Tab (`NotAllowedError`). **Live-validated publishing path
+  = PCF code component (or same-origin web resource / custom page); remaining validation is runtime +
+  Microsoft support, not permissions.** See spike §11. **[Confirmed — embedded same-origin capture
+  works]**
+- **PCF Media Host POC BUILT (2026-05-31) — packaging finding + resolution:** `alex_AcvMediaHost`
+  ("Visual Engagement Media Host") was scaffolded under `pcf/acv-media-host`, wrapping the proven
+  `RealMediaSession` ACS engine (token → join → publish camera/mic → render local + remote → cleanup),
+  with config from PCF inputs (dynamic `acsGroupId`/`contextId`/`tokenUrl`, no static group, no token in
+  code). **A PCF cannot *bundle* the ACS Calling SDK** — minified it is ~5.5 MiB, over PCF's **hard 5 MB
+  per-component limit** (`pcf-1045`), and code-splitting is forbidden (`pcf-scripts` forces
+  `maxChunks: 1`, *"the PCF runtime cannot handle chunked bundles"*). **Resolved by loading the SDK at
+  runtime:** the SDK is built separately into a standalone self-contained IIFE
+  (`sdk-host/dist/acv-acs-sdk.js`, ~5.15 MiB, exposes `window.AcvAcs`) and loaded by the control via a
+  `<script>` from a configurable `sdkUrl`. The PCF component bundle is then **21.4 KiB** and
+  **production packaging SUCCEEDS** (`solution.zip` ~11 KB). Remaining: build + host the SDK file
+  (same-origin web resource or allowlisted host) and the live in-Dynamics 2-way test. See spike §12.
+  **[Confirmed — ACS SDK builds in PCF; live runtime pending]**
 
 ## 6. Co-browsing (future, out of MVP scope)
 
