@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Workspace media-surface feasibility spike (read-only; docs only)
+- `docs/workspace-media-surface-spike.md`: read-only spike evaluating which Dynamics 365 workspace
+  hosting surface can publish camera/microphone for ACS video. Confirms the cross-origin Application
+  Tab is blocked by the iframe Permissions Policy (`NotAllowedError`, live diagnostics), evaluates
+  **PCF code component** (most promising target — runs in host DOM/origin, bundles ACS SDK), **HTML web
+  resource** (cheapest same-origin probe), **custom page**, and **App Tab / Side Pane** (limitation:
+  no maker control over iframe `allow`). Documents risks, Microsoft validation questions, and a
+  recommended next step that **explicitly avoids the pop-out UX**.
+- Updated `docs/known-limitations.md` (new §5a on embedded camera/mic publishing; tightened validation
+  item 3), `docs/d365-agent-workspace-integration.md` (media-publishing surface decision note),
+  `docs/cif-v2-configuration.md` (new §10.9 surface-selection summary).
+
+### Notes (media-surface spike)
+- **No Dynamics 365 / Power Platform changes were made.** No PCF built or deployed, no web resource /
+  custom page created, no app profile / workstream / queue / routing / session-template change, no
+  Azure provisioning, no new product features. The pop-out window remains **rejected** as the agent UX
+  (kept only behind the `?debug=1` developer flag).
+
 ### Added — Phase 4A Part 1 D365 workspace & channel planning (planning docs only)
 - `docs/d365-agent-workspace-integration.md`: plan for integrating the **mock** agent media panel
   into the D365 Customer Service / Contact Center workspace; native-vs-custom responsibility split;

@@ -43,7 +43,8 @@ Close these with Microsoft (product group / FastTrack / account team) before pro
 
 1. Supported pattern to **attach a custom ACS media session to a routed work item**?
 2. Can a **custom ACS interaction consume agent capacity** via Unified Routing?
-3. Recommended approach to **embed ACS WebRTC inside the D365 workspace** (PCF/CIF iframe `getUserMedia`); required iframe/browser-policy config?4. Can **custom ACS recordings be consumed by D365 Quality Management**?
+3. Recommended approach to **embed ACS WebRTC inside the D365 workspace** (PCF/CIF iframe `getUserMedia`); required iframe/browser-policy config? Specifically: does the model-driven app page (`*.crm.dynamics.com`) emit a document-level **Permissions-Policy** allowing `camera; microphone`, and can a **PCF / web resource** (same-origin/in-DOM) call `getUserMedia`? See [workspace-media-surface-spike.md](workspace-media-surface-spike.md) §7. **[Open — partially confirmed: cross-origin app-tab is blocked, see §8]**
+4. Can **custom ACS recordings be consumed by D365 Quality Management**?
 5. **Which supervisor capabilities** (monitor/consult/barge) can be reused vs custom-built?
 6. **Licensing** for D365 Contact Center seats, ACS consumption, recording, Teams interop?
 7. Any **roadmap** for a standalone native video channel that could reduce custom scope?
@@ -59,6 +60,24 @@ supportability validation. These are first-class workstreams, not afterthoughts.
 - Omnichannel internal entity **logical names vary by version** — confirm in the target environment. **[Validate]**
 - **No built-in ACS geo-replication/DR** — disaster recovery is app-level. **[Confirmed]**
 - **No Microsoft reference architecture** exists for a custom ACS media channel — higher design risk. **[Confirmed — live (absence)]**
+
+## 5a. Camera/microphone publishing from an embedded workspace surface
+
+- **The cross-origin Application Tab (Third-Party Website) cannot publish camera/microphone.**
+  Confirmed live (2026-05-31): inside the embedded app-tab iframe, `getUserMedia` fails with
+  `NotAllowedError: Permission denied` (camera/mic permission `denied`). A cross-origin iframe is
+  denied media unless the **host** delegates `allow="camera; microphone"`, which is **not** an
+  admin/maker-controllable attribute on the app-tab/side-pane iframe. **[Confirmed — live]**
+- **Misleading ACS signal:** with capture denied, the ACS SDK still reports `startVideo: success` and
+  "video published" because a `LocalVideoStream` object is attached — but **no frames flow**, so the
+  customer's Agent tile is black. "Published" ≠ "transmitting". **[Confirmed — live]**
+- **The pop-out top-level window is REJECTED** as the agent UX (kept only as a `?debug=1` diagnostic).
+  **[Decision]**
+- **Likely path:** host the publishing code on a **same-origin / in-DOM** surface (PCF code component
+  preferred; HTML web resource as the cheapest first probe) so capture is governed by the workspace
+  page's own policy rather than a denied cross-origin delegation. Feasibility is a **grounded
+  hypothesis pending a same-origin probe + Microsoft validation** — see
+  [workspace-media-surface-spike.md](workspace-media-surface-spike.md). **[Validate]**
 
 ## 6. Co-browsing (future, out of MVP scope)
 
