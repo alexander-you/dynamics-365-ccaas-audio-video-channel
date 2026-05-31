@@ -3,6 +3,7 @@ import { createMediaSession } from "./mediaSession";
 import { AgentPanel } from "./agentPanel";
 import { CifBridge } from "./cif";
 import { readAvContext } from "./context";
+import { resolveAcsGroupId } from "./sessionResolver";
 import "./styles.css";
 
 const root = document.getElementById("app");
@@ -18,6 +19,21 @@ async function boot(rootEl: HTMLElement): Promise<void> {
   const base = readAvContext();
   const overrides = await cif.getContextOverrides();
   const ctx = { ...base, ...overrides };
+
+  // MEDIA STAGE dynamic resolution: when this panel loads inside the Visual Engagement application
+  // tab, the D365 session-template slug puts a SUPPORTED context id on the URL (liveWorkItemId /
+  // conversationId / convId / sessionId). If we don't already have an acsGroupId, ask the relay
+  // (GET /api/session) to resolve the ACS group the customer minted, so the agent joins the SAME
+  // group. No static/hardcoded group is ever used; if resolution fails the panel stays in waiting.
+  const search =
+    typeof window !== "undefined" ? window.location.search : "";
+  if ((ctx.acsGroupId?.trim() ?? "") === "") {
+    const resolved = await resolveAcsGroupId(search);
+    if (resolved) {
+      ctx.acsGroupId = resolved;
+    }
+  }
+
   const session = createMediaSession(ctx);
   new AgentPanel(rootEl, session, cif);
 

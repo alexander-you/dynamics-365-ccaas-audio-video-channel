@@ -19,6 +19,7 @@
 // returned so the relay can be exercised end-to-end without touching D365.
 
 import { ClientSecretCredential } from '@azure/identity';
+import { putMapping } from './sessionStore.js';
 
 function requiredEnv(name) {
   const value = process.env[name];
@@ -104,12 +105,13 @@ export async function createConversation({ customerName, avContext }, log) {
     conversationcontext[key] = { isDisplayable: true, value };
   }
 
+  const conversationrequestid = `acv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const created = await call('/api/v1.0/consumer/conversation/create', 'POST', {
     customercontext: {
       preferredname: customerName || 'Audio/Video customer',
     },
     conversationcontext,
-    conversationrequestid: `acv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    conversationrequestid,
     startmessage: {
       message: opening,
       displayname: 'ACV Relay',
@@ -118,5 +120,18 @@ export async function createConversation({ customerName, avContext }, log) {
   }, log);
 
   const conversationId = created.conversationId || created.id;
+
+  // Persist a temporary correlation row so the agent media panel can resolve the
+  // ACS group at runtime (conversationId -> acsGroupId). Only ids are stored — never
+  // recordings, transcripts, business metadata, tokens, or secrets. Non-fatal.
+  const acsGroupId =
+    avContext && typeof avContext.acsGroupId === 'string' ? avContext.acsGroupId : undefined;
+  if (conversationId && acsGroupId) {
+    await putMapping(
+      { id: conversationId, acsGroupId, correlationId: conversationrequestid },
+      log,
+    );
+  }
+
   return { conversationId, mode: 'live', isNew: created.isNew };
 }
