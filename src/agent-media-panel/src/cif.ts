@@ -33,6 +33,12 @@ interface CIFrameworkApi {
   // Returns environment/config for the widget, including any custom parameters the channel
   // provider was configured with. Shape is host-defined; we parse defensively.
   getEnvironment?(): Promise<string>;
+  // Panel visibility (CIF v2). mode: 0 = minimized/hidden, 1 = docked/expanded. In Omnichannel
+  // multisession apps the provider panel commonly loads minimized, so the widget must call this
+  // to make itself visible. Returns the resulting mode as a string.
+  setMode?(mode: number): Promise<string>;
+  // Optional panel width (pixels) for the provider panel.
+  setWidth?(width: number): Promise<string>;
   // Subscribes to CIF lifecycle events (e.g., "onpagenavigate").
   addHandler?(eventName: string, handler: (...args: unknown[]) => void): void;
 }
@@ -178,6 +184,32 @@ export class CifBridge {
       log("setPresence (cif) → ok", presence);
     } catch (err) {
       log("setPresence (cif) error", err);
+    }
+  }
+
+  /**
+   * Make the provider panel visible in the workspace (CIF v2 `setMode(1)` = docked/expanded) and
+   * optionally set its width. In Omnichannel/Copilot Service multisession apps the provider panel
+   * frequently loads **minimized**, so a freshly-loaded widget can be running yet invisible — this
+   * is the usual cause of "the widget didn't appear". Safe no-op in standalone mode.
+   */
+  async revealPanel(widthPx = 400): Promise<void> {
+    if (!this.api?.setMode) {
+      log("revealPanel (unavailable) → skipped");
+      return;
+    }
+    try {
+      const result = await this.api.setMode(1);
+      if (this.api.setWidth) {
+        try {
+          await this.api.setWidth(widthPx);
+        } catch (err) {
+          log("revealPanel.setWidth (cif) error", err);
+        }
+      }
+      log("revealPanel (cif) → setMode(1)", result);
+    } catch (err) {
+      log("revealPanel (cif) error", err);
     }
   }
 

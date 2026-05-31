@@ -21,6 +21,11 @@ async function boot(rootEl: HTMLElement): Promise<void> {
   const session = createMediaSession(ctx);
   new AgentPanel(rootEl, session, cif);
 
+  // CIF v2: when embedded as a provider in an (Omnichannel/Copilot Service) workspace, the provider
+  // panel often loads MINIMIZED — so the widget can be running yet invisible. Make it visible.
+  // No-op in standalone mode (the CIF API is absent).
+  void cif.revealPanel();
+
   // CIF-embedded live experience: when the panel loads as a real (live) widget — i.e. embedded as a
   // CIF v2 channel provider with mode=live — auto-join the ACS group so the agent's video appears
   // in the Communication Panel without a manual click. join() is idempotent and the UI still shows

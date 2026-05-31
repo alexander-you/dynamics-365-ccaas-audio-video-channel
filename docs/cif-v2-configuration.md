@@ -144,9 +144,15 @@ Framework** app / `msdyn_*` provider tables) with these proposed values:
 - CIF v2 does **not** route work, **not** create a native Omnichannel conversation, and **not**
   consume capacity — routing/capacity is separate (see
   [d365-workstream-and-channel-strategy.md](d365-workstream-and-channel-strategy.md)). **[Confirmed — live]**
-- The native first-party communication panel **cannot be fully reused** for custom media; the media
-  controls are the **custom panel**. **[Confirmed]**
-- Whether the CIF `iframe` permits `getUserMedia` / `getDisplayMedia` (real media, later) and the
+- A CIF v2 provider widget **does load inside Omnichannel / Copilot Service workspace multisession
+  apps** (Microsoft supports non-Microsoft providers there). The real limitation is narrower: the
+  widget is a **separate provider-owned surface** with its own session context — it does **not**
+  become a native first-party conversation control and does **not** take over or modify an existing
+  first-party chat/voice conversation panel. Custom media controls therefore live in the **custom
+  provider widget**, alongside (not inside) any first-party conversation. **[Corrected 2026-05-31]**
+- In multisession apps the provider panel can load **minimized**; the widget should call
+  `Microsoft.CIFramework.setMode(1)` to make itself visible (implemented via `CifBridge.revealPanel()`).
+- Whether the CIF `iframe` permits `getUserMedia` / `getDisplayMedia` (real media) and the
   exact `allow`/CSP/Permissions-Policy required is an **open validation item**. **[Validate with Microsoft]**
 - Presence/session APIs availability depends on the workspace app edition and configuration.
   **[Validate in target environment]**
@@ -212,3 +218,31 @@ media. This is the open validation item from §9 — confirm with Microsoft for 
 > workstream/queue/native conversation. The BYOC relay’s `/api/inbound` still provides the routed
 > messaging work item + context separately. Rollback: detach the provider from the app profile (or
 > change the Channel URL back to mock / drop `?mode=live`).
+
+### 10.5 "Widget didn't appear" — validation checklist
+
+The expected outcome is an **external CIF v2 provider widget loaded inside the Omnichannel / Copilot
+Service workspace** (its own provider-owned surface) — **not** a native routed conversation. If the
+widget does not appear, validate in order; the first failing item is almost always the cause:
+
+1. **Provider attached to the *active* app profile.** The provider must be on the exact app profile
+   the test app uses (App Profile Manager → the profile bound to "Copilot Service workspace").
+2. **Test user assigned to that app profile.** A user has one profile per app; attaching to a
+   different profile has no effect for that user.
+3. **Provider-owned / default session visibility.** The widget renders in its provider panel against
+   a session. Confirm it shows on the **default (home) session** or open a provider-owned session.
+4. **Multi-provider home-session limitation handled.** With multiple CIF providers, the home session
+   can show only one panel at a time; ensure this provider is the selected/active one (or test with
+   it as the only provider).
+5. **Panel made visible (`setMode`).** In multisession apps the panel can load **minimized**. The
+   widget calls `Microsoft.CIFramework.setMode(1)` on load (`CifBridge.revealPanel()`); verify the
+   console shows `[CIF] revealPanel (cif) → setMode(1)` and the panel is docked, not collapsed.
+6. **Channel URL loads in the CIF iframe.** Open devtools → the provider iframe should load
+   `…/dynamics-365-ccaas-audio-video-channel/?mode=live` (HTTP 200), not a blank/blocked frame.
+7. **No iframe / CSP / sandbox / permissions errors in the console.** Watch for `X-Frame-Options`/
+   `frame-ancestors` blocks, `sandbox` restrictions, or `NotAllowedError` / permissions-policy
+   violations for `camera`/`microphone` (the latter blocks media even when the widget itself loads).
+
+> Items 1–4, 6 are validated in the D365 admin UI / agent session by an admin; items 5 and 7 are
+> validated from the browser devtools console while signed in as the test agent. The widget-side
+> wiring for item 5 ships in the hosted build (`CifBridge.revealPanel()`).
