@@ -26,12 +26,28 @@ async function boot(rootEl: HTMLElement): Promise<void> {
   // No-op in standalone mode (the CIF API is absent).
   void cif.revealPanel();
 
-  // CIF-embedded live experience: when the panel loads as a real (live) widget — i.e. embedded as a
-  // CIF v2 channel provider with mode=live — auto-join the ACS group so the agent's video appears
-  // in the Communication Panel without a manual click. join() is idempotent and the UI still shows
-  // the controls. Standalone/mock loads (the safe bare public URL) never reach this branch.
+  // Two roles for the SAME hosted panel, distinguished by the `surface` URL marker:
+  //  • CONTROLLER (no `surface=tab`): the provider panel loaded alongside the native Omnichannel
+  //    Communication Panel. It does NOT replace the chat — it surfaces the Visual Engagement media
+  //    stage as its OWN application tab (Application Tab Template `alex_acv_media_tab_poc`) via the
+  //    app-tab API.
+  //  • MEDIA STAGE (`surface=tab`): the panel loaded INSIDE that application tab. It joins the ACS
+  //    group call when an acsGroupId is present, otherwise stays in the safe waiting state. It never
+  //    opens another tab (this is what prevents tab-spawning recursion).
+  // NOTE: passing the dynamic acsGroupId into the media-stage URL is the remaining live-validation
+  // step — see docs/cif-v2-configuration.md §10.7. Until then the media stage loads in waiting state
+  // (no static group is ever used).
+  const surface = new URLSearchParams(
+    typeof window !== "undefined" ? window.location.search : ""
+  ).get("surface");
+  const isMediaStage = surface === "tab" || (ctx.acsGroupId?.trim() ?? "") !== "";
+
   if (!session.isMock) {
-    void session.join();
+    if (isMediaStage) {
+      void session.join();
+    } else {
+      void cif.openMediaTab();
+    }
   }
 }
 

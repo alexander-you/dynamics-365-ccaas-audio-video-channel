@@ -335,3 +335,88 @@ focused — it surfaces on the **Home / provider-owned session**, not inside the
 > **What this confirms:** routing/messaging works end-to-end (chat = routed OC conversation) and the
 > media plane works (customer connected). The remaining work is **agent-side surfacing + context
 > flow**, not a provider-registration or media bug.
+
+### 10.7 Option A POC — Visual Engagement media tab (approved 2026-05-31)
+
+**Approved direction:** keep the native Omnichannel conversation in the **Communication Panel**
+(chat, unchanged) and surface the custom audio/video experience as its **own Application Tab** in the
+same agent session. **This is not a native replacement of the Omnichannel communication panel — it is
+a native Omnichannel conversation alongside a custom Visual Engagement media tab.** No injection into,
+or replacement of, the Omnichannel conversation control.
+
+**Target UX**
+
+| Surface | Owner | Content |
+|---|---|---|
+| Communication Panel | Native Omnichannel | Routed chat/messaging conversation (unchanged) |
+| Visual Engagement application tab | Custom (this project) | Hosted A/V panel joining the same ACS group as the customer |
+
+#### 10.7.1 What was built (reversible POC)
+
+- **Application Tab Template** `alex_acv_media_tab_poc` (`msdyn_applicationtabtemplate`)
+  created **in the POC solution `alex_visual_engagement_channel`**. Page type = **Third Party Website** (`509180006`);
+  `msdyn_templateparameters` url =
+  `https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/?mode=live&surface=tab`.
+  It is **additive and unbound** (not attached to any session template), so it changes no existing
+  behavior until referenced. Rollback = delete the record.
+- **Panel role split** ([agent-media-panel `main.ts`](../src/agent-media-panel/src/main.ts) +
+  [`cif.ts`](../src/agent-media-panel/src/cif.ts)). The same hosted panel plays two roles, keyed by a
+  `surface` URL marker:
+  - **Controller** (no `surface=tab`): the provider panel loaded next to the native comms panel. On
+    live load it calls `CifBridge.openMediaTab()` → `Microsoft.Apps.createTab("alex_acv_media_tab_poc")`
+    to open the Visual Engagement tab. It never joins a call itself.
+  - **Media stage** (`surface=tab`): the panel inside the application tab. It joins the ACS group when
+    an `acsGroupId` is present, else stays in the safe **waiting state**. It never opens another tab
+    (prevents tab-spawning recursion).
+- **Customer side** ([customer-web `call.ts`](../src/customer-web/src/call.ts)) now **mints a fresh
+  random `acsGroupId` per call** (`crypto.randomUUID`) instead of a static demo GUID, so **no static
+  group flows anywhere**: customer → relay → `conversationcontext` → (agent).
+
+#### 10.7.2 Validated platform finding — custom context keys are NOT a valid app-tab URL slug
+
+While building the template, the Dataverse Web API **stripped** an `…&acsGroupId={acsGroupId}` slug
+from the app-tab url (stored `null`), but **accepted** plain URLs and query strings. The
+`msdyn_applicationtabtemplate` entity has **no N:N to context variables** — its only N:N is to
+`msdyn_sessiontemplate` (`msdyn_sessiontemplate_applicationtab`). **Conclusion:** an arbitrary
+conversation-context key (`acsGroupId`) **cannot** be injected declaratively as an app-tab URL slug on
+its own. The supported declarative path requires the slug to be a **recognized session/context
+variable**, which lives at the **session-template** level — not the app-tab level.
+
+#### 10.7.3 Remaining step to close the agent-join loop (needs a live working session)
+
+Closing items 3–5 of the POC (dynamic `acsGroupId` → agent joins same group) requires **one** of:
+
+- **A. Session-template context variable (declarative):** create a session template that defines an
+  `acsGroupId` context variable mapped from the conversation context, references the app-tab template,
+  and uses the `{acsGroupId}` slug in the tab URL. This is the most "native" path but needs a session
+  template and (to auto-open) binding to `alex_inbox` — i.e. it **modifies the existing inbox
+  workstream's session behavior**, so it needs explicit approval.
+- **B. Runtime reader (programmatic):** a small **Web Resource** app tab (Dataverse origin) that reads
+  the active conversation's `acsGroupId` via the client session/context API and iframes the hosted
+  panel with `?mode=live&surface=tab&acsGroupId=<resolved>`; **or** the relay stores the
+  `conversationId → acsGroupId` map and the panel looks it up by the active conversation id. No change
+  to `alex_inbox`, but it needs client-API behavior that must be **validated in a live agent session**
+  (the CIF widget frame's access to conversation context could not be runtime-verified here).
+
+Until one of these is wired, the Visual Engagement tab opens and loads the panel in the **safe waiting
+state** (no static group, no wrong call) — POC validation items 1–2 pass; items 3–6 are pending the
+live step above.
+
+#### 10.7.4 POC validation checklist (Option A)
+
+| # | Check | Status |
+|---|---|---|
+| 1 | Conversation arrives in the **native** Omnichannel Communication Panel (unchanged) | ✅ (§10.6) |
+| 2 | Visual Engagement **application tab opens / can be opened** in the same session | ⏳ live |
+| 3 | Tab panel receives the **correct dynamic `acsGroupId`** | ⏳ live (needs §10.7.3) |
+| 4 | Agent **joins the same ACS group call** as the customer | ⏳ live |
+| 5 | Customer and agent **see each other** | ⏳ live |
+| 6 | **No static `acsGroupId`** anywhere in the path | ✅ (customer mints per-call GUID; agent has no static fallback) |
+
+#### 10.7.5 Rollback
+
+- Delete `alex_acv_media_tab_poc` (`msdyn_applicationtabtemplate`) — additive, safe.
+- Revert the panel/customer-web PR (single revert); GitHub Pages redeploys the prior build.
+- No session template was bound to `alex_inbox`, so the inbox workstream behavior is unchanged and
+  needs no rollback.
+
