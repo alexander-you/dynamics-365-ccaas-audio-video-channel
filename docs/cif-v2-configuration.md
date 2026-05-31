@@ -464,4 +464,29 @@ which is fully reversible (§10.7.5).
   Contributor` role grant, redeploy the prior relay; the table can be deleted).
 - Revert the panel/customer-web PR (single revert); GitHub Pages redeploys the prior build.
 
+### 10.9 Media-publishing surface — cross-origin tab blocked; same-origin/in-DOM is the path (2026-05-31)
+
+The routing/context loop above (open the tab, resolve the dynamic `acsGroupId`, join the same ACS
+group) is **solved and working**. The remaining problem is **agent camera/microphone publishing**: the
+Visual Engagement tab is a **cross-origin Application Tab (Third-Party Website)**, and live in-tab
+diagnostics confirmed `getUserMedia` is **blocked by the iframe Permissions Policy**
+(`NotAllowedError: Permission denied`) — see §10.3 and §10.8.
+
+A **read-only feasibility spike** evaluated which Dynamics surface can publish media without a pop-up:
+
+| Surface | Camera/mic verdict |
+|---|---|
+| Application Tab / Side Pane (third-party URL) | **Blocked** — cross-origin iframe `allow` is host-controlled, not configurable. Limitation. |
+| **HTML web resource** (same-origin `*.crm.dynamics.com`) | **Likely** — same-origin inherits parent permission; cheapest first probe. Depends on host page document Permissions-Policy + possible sandbox. |
+| **PCF code component** (runs in host DOM/origin) | **Most promising target** — no cross-origin iframe; must bundle ACS SDK; validate worker/WASM/bundle/lifecycle + host policy. |
+| Custom page | Viable host; same permission unknowns as PCF; extra context-flow work. |
+
+**Recommended path (no pop-out):** (1) a minimal **same-origin web-resource capture probe** to confirm
+the workspace page's document-level Permissions-Policy actually allows `camera; microphone`; (2) if it
+does, build the media surface as a **PCF code component** wrapping the existing `IMediaSession` panel;
+(3) validate supportability with Microsoft. Full detail, risks, and the exact Microsoft validation
+questions are in [workspace-media-surface-spike.md](workspace-media-surface-spike.md). **No PCF, web
+resource, custom page, Azure, or schema work is approved yet** — this is a documented recommendation
+pending approval.
+
 

@@ -60,6 +60,18 @@ profile** (not a production profile). The exact app and profile are confirmed be
 > *same* UI can be wrapped as PCF later with no rewrite. We only adopt PCF when a concrete requirement
 > (form binding, dataset binding, lifecycle hooks) appears.
 
+> **Update (2026-05-31) — media-publishing surface decision.** Live testing confirmed that the
+> hosted panel **cannot publish camera/microphone** when surfaced as a **cross-origin Application Tab
+> (Third-Party Website)** — `getUserMedia` is blocked by the iframe Permissions Policy
+> (`NotAllowedError`). The control surface (notification, presence, controls) still works via CIF, but
+> the **media-publishing** part must move to a **same-origin / in-DOM** surface. A read-only spike
+> ([workspace-media-surface-spike.md](workspace-media-surface-spike.md)) recommends: **HTML web
+> resource** as the cheapest same-origin capture probe, then **PCF code component** as the target
+> (runs in the host DOM/origin, bundles the ACS SDK), pending Microsoft validation of the workspace
+> page's document-level Permissions-Policy. The **pop-out window is rejected** as the agent UX (kept
+> only as a `?debug=1` diagnostic). This reorders the table below: a web resource / PCF is now the
+> media path, not merely an alternative.
+
 ### 3.1 The CIF v2 channel panel vs an app session tab
 
 - **CIF v2 channel panel** — the side panel that CIF providers render into. Good for **call controls,
