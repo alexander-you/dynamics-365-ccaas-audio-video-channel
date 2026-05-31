@@ -369,11 +369,14 @@ export class RealMediaSession implements IMediaSession {
 
       const wantVideo = this.ctx.requestedMedia === "audio-video";
       let localVideoStreams: LocalVideoStream[] | undefined;
+      let cameraError: string | undefined;
       if (wantVideo) {
-        const camera = await this.firstCamera();
+        const { camera, error } = await this.acquireCamera();
         if (camera) {
           this.localVideoStream = new LocalVideoStream(camera);
           localVideoStreams = [this.localVideoStream];
+        } else {
+          cameraError = error;
         }
       }
 
@@ -382,9 +385,20 @@ export class RealMediaSession implements IMediaSession {
         localVideoStreams ? { videoOptions: { localVideoStreams } } : {}
       );
       this.wireCall(this.call);
+      const publishedVideo = Boolean(this.localVideoStream);
       this.update(
-        { state: "connected", local: { ...this.snapshot.local, cameraOff: !wantVideo || !this.localVideoStream } },
-        { severity: "info", text: "Connected to ACS group call." }
+        { state: "connected", local: { ...this.snapshot.local, cameraOff: !wantVideo || !publishedVideo } },
+        wantVideo && !publishedVideo
+          ? {
+              severity: "warning",
+              text:
+                "Connected to ACS group call (audio only) — your camera could not be published. " +
+                (cameraError ?? "No camera was available."),
+              fallbackHint:
+                "If you are inside the Dynamics workspace tab, camera capture is often blocked by the " +
+                "embedded iframe's permissions policy. Open the panel in a separate browser window to publish video."
+            }
+          : { severity: "info", text: "Connected to ACS group call." }
       );
       this.refreshParticipants();
     } catch (err) {
@@ -400,15 +414,41 @@ export class RealMediaSession implements IMediaSession {
     }
   }
 
-  private async firstCamera(): Promise<VideoDeviceInfo | undefined> {
-    if (!this.deviceManager) return undefined;
+  /**
+   * Acquire the first available camera, distinguishing the common failure modes so the agent sees
+   * WHY video could not be published (instead of silently joining audio-only). Inside the Dynamics
+   * app-tab iframe, camera capture is frequently blocked by the iframe Permissions Policy — that
+   * surfaces here as a NotAllowedError / permissions-policy violation from askDevicePermission.
+   */
+  private async acquireCamera(): Promise<{ camera?: VideoDeviceInfo; error?: string }> {
+    if (!this.deviceManager) return { error: "Device manager unavailable." };
     try {
       await this.deviceManager.askDevicePermission({ audio: true, video: true });
-    } catch {
-      /* permission prompt may be unavailable; continue and let getCameras report */
+    } catch (err) {
+      const name = err instanceof Error ? err.name : "";
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/NotAllowedError|permission/i.test(`${name} ${msg}`)) {
+        return {
+          error:
+            "Camera/microphone permission was denied (NotAllowedError / permissions policy). " +
+            "This is typical inside an embedded Dynamics iframe.",
+        };
+      }
+      if (/NotReadableError|TrackStart/i.test(`${name} ${msg}`)) {
+        return { error: "The camera is in use by another application (NotReadableError)." };
+      }
+      // Permission prompt may simply be unavailable; fall through and let getCameras report.
     }
-    const cameras = await this.deviceManager.getCameras();
-    return cameras[0];
+    try {
+      const cameras = await this.deviceManager.getCameras();
+      if (cameras.length === 0) {
+        return { error: "No camera devices were found (getCameras returned empty)." };
+      }
+      return { camera: cameras[0] };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { error: `Could not enumerate cameras: ${msg}` };
+    }
   }
 
   private wireCall(call: Call): void {
@@ -503,11 +543,27 @@ export class RealMediaSession implements IMediaSession {
       if (off) {
         if (this.localVideoStream) await this.call.stopVideo(this.localVideoStream);
       } else {
-        const camera = this.localVideoStream?.source ?? (await this.firstCamera());
-        if (camera) {
-          this.localVideoStream = this.localVideoStream ?? new LocalVideoStream(camera);
-          await this.call.startVideo(this.localVideoStream);
+        let camera = this.localVideoStream?.source;
+        if (!camera) {
+          const acquired = await this.acquireCamera();
+          if (!acquired.camera) {
+            this.update(
+              { local: { ...this.snapshot.local, cameraOff: true } },
+              {
+                severity: "warning",
+                text: `Camera could not be turned on. ${acquired.error ?? ""}`.trim(),
+                fallbackHint:
+                  "Inside the Dynamics workspace tab, camera capture is often blocked by the iframe " +
+                  "permissions policy. Open the panel in a separate browser window to publish video.",
+              }
+            );
+            this.refreshParticipants();
+            return;
+          }
+          camera = acquired.camera;
         }
+        this.localVideoStream = this.localVideoStream ?? new LocalVideoStream(camera);
+        await this.call.startVideo(this.localVideoStream);
       }
     }
     this.update({ local: { ...this.snapshot.local, cameraOff: off } });
