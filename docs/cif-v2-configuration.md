@@ -17,6 +17,24 @@ Related: [d365-agent-workspace-integration.md](d365-agent-workspace-integration.
 
 ## 1. Channel Provider record (proposed)
 
+> **Registered state (verified 2026-05-31).** This provider has been created in the POC environment
+> (`demo-contact-center-en.crm4.dynamics.com`). It lives in the **`msdyn_channelprovider`** table
+> (the agent-experience-profile provider entity), **not** `msdyn_ciprovider` (classic CIF, which binds
+> only to user membership). Actual record:
+>
+> | Field | Registered value |
+> |---|---|
+> | `msdyn_name` / `msdyn_uniquename` | `alex_acvprovider_poc` |
+> | `msdyn_label` | `Audio/Video (POC)` |
+> | `msdyn_channelurl` | `https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/?mode=live` |
+> | `msdyn_trusteddomain` | `https://alexander-you.github.io` |
+> | `msdyn_apiversion` | `162450000` (= **2.0**) |
+> | `msdyn_customparams` | `{ "mode": "live" }` — **no `acsGroupId`** (resolved dynamically; see §10.2) |
+> | App profile attachment | **`alex_inbox` only** (by explicit approval — see §3) |
+>
+> This is **CIF provider / widget integration validation**, not a completed native Omnichannel
+> channel. No workstream, queue, routing, or Dataverse A/V session schema is created.
+
 The CIF v2 Channel Provider is a Dataverse configuration record (in the **Channel Integration
 Framework** app / `msdyn_*` provider tables) with these proposed values:
 
@@ -65,10 +83,17 @@ Framework** app / `msdyn_*` provider tables) with these proposed values:
 ## 3. App profile association
 
 - CIF v2 providers are surfaced to agents via the **App Profile Manager** (Agent experience profile)
-  bound to the workspace app.
-- **POC:** create or use a **dedicated POC app profile** (not a production profile). Attach the
-  `ACS Audio/Video (POC)` channel provider to it, and assign the profile to the test agent user(s).
-- This isolation guarantees the POC channel never appears for production agents.
+  bound to the workspace app. The binding is the N:N relationship
+  `msdyn_appconfig_msdyn_channelprovider` between `msdyn_appconfiguration` (app profile) and
+  `msdyn_channelprovider` (this provider).
+- **Attached to `alex_inbox` ONLY (by explicit approval, 2026-05-31).** `alex_inbox`
+  ("Customer Service workspace + inbox") is the app profile the test agent is actually assigned to,
+  so it is the only profile that surfaces the widget for that user. This is a **deliberate POC choice**: attaching to the agent's live/active
+  profile carries some blast-radius risk (the widget becomes available to anyone on `alex_inbox`),
+  and **that risk is explicitly accepted for this validation step**. The provider was deliberately
+  **detached** from `alex_acv_poc_profile` and `cc1_contactcenteragentexperienceprofile` to keep the
+  surface scoped to `alex_inbox` only.
+- **Do not attach this provider to any additional app profile without explicit approval.**
 - **The provider loads from the *active* app profile for the user.** A user has exactly **one** app
   profile per app. The widget surfaces only if the provider is attached to the profile the user is
   actually on — attaching it to a different profile has no effect for that user.
@@ -188,11 +213,24 @@ Same record as §1, with these changes:
 |---|---|---|
 | **Channel URL** | `https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/?mode=live` | `mode=live` flips the widget to real ACS at runtime |
 | **Trusted domain** | `https://alexander-you.github.io` | Must be HTTPS and allow-listed |
-| **Custom Parameters** | `{ "mode": "live", "acsGroupId": "7a9f5c2e-0b1d-4e6a-9c3f-1a2b3c4d5e6f" }` | `mode=live` + the **same** group GUID the customer joins |
+| **Custom Parameters** | `{ "mode": "live" }` | `mode=live` only. **No `acsGroupId`** — see below |
 
+> **`acsGroupId` is resolved dynamically per session — never statically configured.** The provider's
+> Custom Parameters intentionally contain **only** `{ "mode": "live" }`. The ACS group the agent joins
+> is supplied at runtime from the **routed conversation context** (the relay puts it on the URL query
+> string / CIF custom params for that conversation), not baked into the provider record.
+>
+> - **No dynamic `acsGroupId` available →** the live panel shows a **waiting/configuration state**
+>   ("Waiting for an audio/video session…") and **does not start a call**. There is **no static
+>   fallback group** (the previous hardcoded `7a9f5c2e-…` default was removed from both the panel and
+>   the provider record).
+> - **Dynamic `acsGroupId` present →** the panel joins that exact group (the same one the customer
+>   joined). Verified 2026-05-31 against the hosted panel: `?mode=live` alone → waiting state;
+>   `?mode=live&acsGroupId=<guid>` → acquires a live relay token and connects.
+>
 > Either put `?mode=live` in the **Channel URL** *or* set `mode: "live"` in **Custom Parameters**
-> (`CifBridge.getContextOverrides()` merges custom params over the URL). Pin `acsGroupId` to the
-> shared POC group GUID so the agent and customer land in the same call.
+> (`CifBridge.getContextOverrides()` merges custom params over the URL). Do **not** add `acsGroupId`
+> to the provider record.
 
 ### 10.3 iframe media permissions (required for camera/mic)
 
@@ -203,16 +241,20 @@ media. This is the open validation item from §9 — confirm with Microsoft for 
 
 ### 10.4 Registration steps (admin)
 
-1. Open the **Channel Integration Framework 2.0** app in the target environment.
-2. **New Channel Provider** with the values in §1 + §10.2 (Name, Unique name `alex_acvprovider_poc`,
-   Label `Audio/Video`, **Channel URL** with `?mode=live`, **Trusted domain**
-   `https://alexander-you.github.io`, **Custom Parameters** `{ "mode": "live", "acsGroupId": "<group GUID>" }`,
-   API version **2.0**, Channel order `0`).
-3. In the **app profile** (App Profile Manager) bound to the test workspace app, attach this provider
-   under **Channel providers**, and assign the profile to the test agent user(s) only.
-4. Sign in as the test agent on that app profile → the panel loads in the **Communication Panel**,
-   auto-joins the ACS group, and shows live agent + customer video once the customer joins the same
-   group from the customer-web page (also `mode=live`, same `acsGroupId`).
+1. Open the **Channel Integration Framework 2.0** app (or edit the `msdyn_channelprovider` record
+   directly) in the target environment.
+2. **New Channel Provider** with the values in §1 + §10.2 (Name / Unique name `alex_acvprovider_poc`,
+   Label `Audio/Video (POC)`, **Channel URL** with `?mode=live`, **Trusted domain**
+   `https://alexander-you.github.io`, **Custom Parameters** `{ "mode": "live" }` — **no `acsGroupId`**,
+   API version **2.0**).
+3. In the **app profile** (App Profile Manager), attach this provider under **Channel providers** to
+   **`alex_inbox` only** (the profile the test agent is assigned to). Do **not** attach it to any
+   other profile without explicit approval.
+4. Sign in as the test agent on `alex_inbox` → the panel loads in the **Communication Panel**. With no
+   dynamic `acsGroupId` it shows a **waiting state** (no call placed). Once the routed conversation
+   context supplies an `acsGroupId` (relay-driven), the panel joins that exact ACS group and shows
+   live agent + customer video once the customer joins the same group from the customer-web page
+   (also `mode=live`, same `acsGroupId`).
 
 > **Scope / safety:** this surfaces the widget and starts a real ACS call; it does **not** create a
 > workstream/queue/native conversation. The BYOC relay’s `/api/inbound` still provides the routed
@@ -242,7 +284,16 @@ widget does not appear, validate in order; the first failing item is almost alwa
 7. **No iframe / CSP / sandbox / permissions errors in the console.** Watch for `X-Frame-Options`/
    `frame-ancestors` blocks, `sandbox` restrictions, or `NotAllowedError` / permissions-policy
    violations for `camera`/`microphone` (the latter blocks media even when the widget itself loads).
+8. **Safe waiting state with no dynamic `acsGroupId`.** When the provider loads with only
+   `{ "mode": "live" }` (no `acsGroupId`), the panel must show the **waiting/configuration state**
+   ("Waiting for an audio/video session…") and **must not** start a call or join any group.
+   *(Verified on the hosted panel 2026-05-31.)*
+9. **Dynamic join when `acsGroupId` is supplied.** When the routed conversation context provides an
+   `acsGroupId` (URL query / CIF custom params), the panel transitions to "Acquiring ACS token…" →
+   "Connected to ACS group call" and joins **that** group. *(Verified on the hosted panel
+   2026-05-31.)*
 
-> Items 1–4, 6 are validated in the D365 admin UI / agent session by an admin; items 5 and 7 are
+> Items 1–4, 6 are validated in the D365 admin UI / agent session by an admin; items 5, 7, 8, 9 are
 > validated from the browser devtools console while signed in as the test agent. The widget-side
-> wiring for item 5 ships in the hosted build (`CifBridge.revealPanel()`).
+> wiring for item 5 ships in the hosted build (`CifBridge.revealPanel()`); items 8–9 ship in the
+> dynamic-`acsGroupId` / waiting-state logic (`mediaSession.ts`).
