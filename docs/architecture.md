@@ -114,8 +114,10 @@ flowchart TD
 - **CIF v2** provides workspace hooks: incoming notification (`notifyEvent`), session tab
   (`createSession`), screen-pop (`searchAndOpenRecords` / `createTab`), presence
   (`setPresence`/`getPresence`). **[Confirmed — live]**
-- The **native first-party communication panel cannot be fully reused**; media controls are a
-  **custom PCF / web component** hosting the ACS Calling SDK. **[Confirmed]**
+- A CIF v2 provider widget **loads inside Omnichannel / Copilot Service workspace** apps; it is a
+  **separate provider-owned surface**, not a takeover of the first-party conversation control. Media
+  controls live in the **custom web component / PCF** widget hosting the ACS Calling SDK, alongside
+  (not inside) any first-party conversation panel. **[Corrected 2026-05-31]**
 - CIF v2 does **not** auto-create a native Omnichannel conversation or consume capacity. **[Confirmed — live]**
 
 ### 5.1 Agent media component (scaffold — Phase 3c)
