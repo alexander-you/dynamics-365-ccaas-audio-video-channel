@@ -3,9 +3,9 @@
 // The UI depends ONLY on IMediaSession — never on the ACS SDK directly.
 
 import type { IMediaSession } from "./mediaSession";
-import type { SessionSnapshot, RecordingStatus, ConsentStatus } from "./types";
+import type { SessionSnapshot, RecordingStatus, ConsentStatus, MediaDiagnostics } from "./types";
 import { CifBridge, makeMockIncoming, type CifStatus } from "./cif";
-import { isEmbeddedIframe, buildCallWindowUrl } from "./context";
+import { isEmbeddedIframe, isDebugMode, buildCallWindowUrl } from "./context";
 
 const RECORDING_LABELS: Record<RecordingStatus, string> = {
   "not-recording": "Not recording",
@@ -29,10 +29,12 @@ export class AgentPanel {
   private cifStatus: CifStatus;
   private lastIncoming = "";
 
-  // Call-window (pop-out) state. The embedded Dynamics tab can RECEIVE video but usually cannot
-  // PUBLISH camera/mic (the app-tab iframe Permissions Policy blocks getUserMedia), so the agent
-  // publishes from a top-level pop-out window that joins the same dynamic ACS group.
+  // Call-window (pop-out) state. REJECTED as the agent UX — the native Omnichannel chat stays in the
+  // Communication Panel and the Visual Engagement media experience must live INSIDE the Dynamics
+  // workspace. The pop-out is retained ONLY as an internal diagnostic, gated behind `?debug=1`
+  // (isDebugMode); it is never shown to agents by default. See docs/workspace-media-publishing-findings.md.
   private readonly embedded = isEmbeddedIframe();
+  private readonly debug = isDebugMode();
   private callWindow: Window | null = null;
   private callWindowNote = "";
   private callWindowBlocked = false;
@@ -131,6 +133,8 @@ export class AgentPanel {
         ${s.isMock ? `<p class="muted">Mock mode shows no live video. Run with <code>VITE_USE_MOCKS=false</code> for real ACS video.</p>` : ""}
       </section>
 
+      ${this.renderDiagnostics(s)}
+
       ${this.renderCallWindow(s)}
 
       <section class="amp-cif" aria-label="Dynamics 365 workspace (CIF v2)">
@@ -183,17 +187,57 @@ export class AgentPanel {
   }
 
   /**
-   * Camera/microphone publishing section. POC media-hosting pattern:
-   *   "D365 embedded tab for context and control, top-level pop-out window for camera/microphone
-   *    publishing when iframe permissions block WebRTC capture."
-   * The embedded Dynamics tab can receive video and drive context/roster/consent/recording, but the
-   * agent publishes camera+mic from a top-level pop-out that joins the SAME dynamic ACS group. No
-   * static group is used and no token/secret is placed on the URL.
+   * In-tab media diagnostics. The target UX keeps the Visual Engagement media experience INSIDE the
+   * Dynamics workspace, so we surface exactly where camera/mic publishing succeeds or fails on this
+   * embedded surface (permissions, getUserMedia, LocalVideoStream, startVideo, preview, publish,
+   * and the exact browser / Permissions-Policy error) instead of silently degrading to audio-only.
+   */
+  private renderDiagnostics(s: SessionSnapshot): string {
+    if (s.isMock) return "";
+    const d = s.diagnostics;
+    if (!d) {
+      return `
+      <section class="amp-diag" aria-label="Media diagnostics">
+        <h2>Media diagnostics</h2>
+        <p class="muted">Run diagnostics to check camera/microphone capture on this embedded Dynamics surface.</p>
+        <div class="btn-row"><button data-diag="run">Run diagnostics</button></div>
+      </section>`;
+    }
+    const yn = (v: boolean): string => (v ? "Yes" : "No");
+    const ok = (v: boolean): string => (v ? "diag-ok" : "diag-bad");
+    const outcomeCls = (o: MediaDiagnostics["getUserMedia"]): string =>
+      o === "success" ? "diag-ok" : o === "failed" ? "diag-bad" : "diag-muted";
+    const permCls = (p: MediaDiagnostics["cameraPermission"]): string =>
+      p === "granted" ? "diag-ok" : p === "denied" ? "diag-bad" : "diag-muted";
+    return `
+      <section class="amp-diag" aria-label="Media diagnostics">
+        <h2>Media diagnostics</h2>
+        <p class="muted">Camera/microphone capture status on this surface (${d.embedded ? "embedded Dynamics iframe" : "top-level window"}).</p>
+        <dl class="diag-grid">
+          <dt>Camera permission</dt><dd class="${permCls(d.cameraPermission)}">${esc(d.cameraPermission)}</dd>
+          <dt>Microphone permission</dt><dd class="${permCls(d.microphonePermission)}">${esc(d.microphonePermission)}</dd>
+          <dt>getUserMedia</dt><dd class="${outcomeCls(d.getUserMedia)}">${esc(d.getUserMedia)}</dd>
+          <dt>LocalVideoStream created</dt><dd class="${ok(d.localVideoStreamCreated)}">${yn(d.localVideoStreamCreated)}</dd>
+          <dt>startVideo</dt><dd class="${outcomeCls(d.startVideo)}">${esc(d.startVideo)}</dd>
+          <dt>Local preview rendered</dt><dd class="${ok(d.localPreviewRendered)}">${yn(d.localPreviewRendered)}</dd>
+          <dt>Video published to ACS</dt><dd class="${ok(d.videoPublished)}">${yn(d.videoPublished)}</dd>
+        </dl>
+        ${d.lastError ? `<p class="diag-err"><strong>Browser error:</strong> ${esc(d.lastError)}</p>` : ""}
+        ${d.permissionsPolicyError ? `<p class="diag-err"><strong>Permissions Policy:</strong> ${esc(d.permissionsPolicyError)}</p>` : ""}
+        <div class="btn-row"><button data-diag="run">Re-run diagnostics</button></div>
+      </section>`;
+  }
+
+  /**
+   * REJECTED pop-out experience — retained as an INTERNAL DIAGNOSTIC only, shown solely when the
+   * panel URL carries `?debug=1`. It is never presented to agents in the normal experience. The
+   * target UX is native Omnichannel chat in the Communication Panel + the Visual Engagement media
+   * experience INSIDE the Dynamics workspace, not a separate browser window.
    */
   private renderCallWindow(s: SessionSnapshot): string {
-    if (s.isMock) return "";
+    if (s.isMock || !this.debug) return "";
     const groupId = (s.acsGroupId ?? "").trim();
-    if (groupId === "") return ""; // No session context yet → nothing to publish into.
+    if (groupId === "") return "";
 
     const note = this.callWindowNote
       ? `<div class="amp-message msg-${this.callWindowBlocked ? "warning" : "info"}">
@@ -203,27 +247,25 @@ export class AgentPanel {
 
     if (this.embedded) {
       return `
-      <section class="amp-callwindow" aria-label="Camera and microphone publishing">
-        <h2>Camera &amp; microphone</h2>
+      <section class="amp-callwindow" aria-label="Pop-out diagnostic (debug only)">
+        <h2>Pop-out call window <span class="diag-tag">debug only — not the product UX</span></h2>
         <p class="muted">
-          This embedded Dynamics tab handles context, roster, consent and recording status, and can
-          show the customer's video. Camera/microphone capture is usually blocked inside the Dynamics
-          tab (iframe permissions policy), so publish your camera and microphone from a separate
-          top-level window that joins the same call.
+          Diagnostic only: opens the panel as a top-level window to confirm whether camera/microphone
+          capture is blocked specifically by the embedded Dynamics iframe. This pop-out is <strong>not</strong>
+          the agent experience and is hidden unless <code>?debug=1</code> is set.
         </p>
         <div class="btn-row">
-          <button data-callwindow="open" class="primary">Open call window</button>
+          <button data-callwindow="open">Open call window (debug)</button>
         </div>
         ${note}
-        <p class="muted">The call window joins the same session (group <code>${esc(groupId)}</code>). No static group and no tokens are placed on the URL.</p>
+        <p class="muted">Joins the same session (group <code>${esc(groupId)}</code>). No static group and no tokens are placed on the URL.</p>
       </section>`;
     }
 
-    // Top-level (pop-out / standalone) window: this IS the publishing endpoint.
     return `
-      <section class="amp-callwindow" aria-label="Camera and microphone publishing">
-        <h2>Camera &amp; microphone</h2>
-        <p class="muted">You are in the standalone call window — camera and microphone publish from here. Keep the Dynamics tab open for context, roster, consent and recording status.</p>
+      <section class="amp-callwindow" aria-label="Pop-out diagnostic (debug only)">
+        <h2>Pop-out call window <span class="diag-tag">debug only</span></h2>
+        <p class="muted">Top-level diagnostic window — camera and microphone publish from here.</p>
       </section>`;
   }
 
@@ -239,6 +281,9 @@ export class AgentPanel {
     });
     this.root.querySelectorAll<HTMLButtonElement>("button[data-callwindow]").forEach((btn) => {
       btn.addEventListener("click", () => this.openCallWindow());
+    });
+    this.root.querySelectorAll<HTMLButtonElement>("button[data-diag]").forEach((btn) => {
+      btn.addEventListener("click", () => void this.session.runDiagnostics?.());
     });
   }
 

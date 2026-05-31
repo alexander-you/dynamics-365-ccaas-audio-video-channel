@@ -106,6 +106,17 @@ export function isEmbeddedIframe(): boolean {
   }
 }
 
+/**
+ * Developer/debug flag, enabled with `?debug=1` (or `debug=true`) on the panel URL. Gates internal
+ * diagnostic-only affordances that must NOT be shown to agents by default — notably the rejected
+ * top-level "call window" pop-out, which is retained only as a developer troubleshooting tool.
+ */
+export function isDebugMode(): boolean {
+  if (typeof window === "undefined") return false;
+  const v = new URLSearchParams(window.location.search).get("debug");
+  return v === "1" || v === "true";
+}
+
 /** The minimum context needed to launch the top-level call window. */
 export interface CallWindowContext {
   acsGroupId: string;

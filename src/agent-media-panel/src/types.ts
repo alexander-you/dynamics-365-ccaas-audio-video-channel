@@ -42,6 +42,40 @@ export interface PanelMessage {
   fallbackHint?: string;
 }
 
+/** Outcome of a one-shot media operation, for the diagnostics panel. */
+export type DiagOutcome = "success" | "failed" | "not-attempted";
+
+/** Browser permission state (mirrors the Permissions API, plus "unknown" when unavailable). */
+export type PermissionState = "granted" | "denied" | "prompt" | "unknown";
+
+/**
+ * Embedded-surface media diagnostics. Surfaced in the panel so we can SEE exactly where camera/mic
+ * publishing fails inside the Dynamics application tab (vs. a top-level window) without guessing.
+ * Every field maps to a concrete WebRTC/ACS step the agent video path depends on.
+ */
+export interface MediaDiagnostics {
+  /** True when the panel is inside an iframe (e.g., the Dynamics app tab) rather than top-level. */
+  embedded: boolean;
+  /** Camera permission as reported by the Permissions API. */
+  cameraPermission: PermissionState;
+  /** Microphone permission as reported by the Permissions API. */
+  microphonePermission: PermissionState;
+  /** Whether a getUserMedia capture attempt succeeded, failed, or has not run yet. */
+  getUserMedia: DiagOutcome;
+  /** Whether an ACS LocalVideoStream object was constructed from a camera. */
+  localVideoStreamCreated: boolean;
+  /** Whether call.startVideo / join-with-video published the local stream. */
+  startVideo: DiagOutcome;
+  /** Whether the local self-preview tile rendered. */
+  localPreviewRendered: boolean;
+  /** Whether the agent's video is published into the ACS group call. */
+  videoPublished: boolean;
+  /** Exact browser error message captured from getUserMedia/askDevicePermission. */
+  lastError?: string;
+  /** Exact Permissions Policy / iframe permission error, when one is detected. */
+  permissionsPolicyError?: string;
+}
+
 /** Local media toggle state owned by the agent. */
 export interface LocalMediaState {
   micMuted: boolean;
@@ -70,5 +104,7 @@ export interface SessionSnapshot {
    * pop-out URL with the SAME dynamic group (never a static group, never a token/secret).
    */
   acsGroupId: string;
+  /** Embedded-surface media diagnostics (live sessions only). */
+  diagnostics?: MediaDiagnostics;
   message?: PanelMessage;
 }
