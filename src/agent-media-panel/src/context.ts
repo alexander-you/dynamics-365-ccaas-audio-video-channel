@@ -90,3 +90,50 @@ export function readAvContext(): AvContext {
   const search = typeof window !== "undefined" ? window.location.search : "";
   return parseAvContext(search);
 }
+
+/**
+ * True when the panel is running inside an iframe — e.g. the Dynamics 365 application tab. Inside
+ * that iframe, camera/microphone capture is frequently blocked by the host's Permissions Policy
+ * (the app-tab iframe has no `allow="camera; microphone"`), so WebRTC capture must happen in a
+ * top-level window instead. A cross-origin parent throws on access, which also means "embedded".
+ */
+export function isEmbeddedIframe(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+/** The minimum context needed to launch the top-level call window. */
+export interface CallWindowContext {
+  acsGroupId: string;
+  mode: string;
+  requestedMedia: RequestedMedia;
+  sessionRef: string;
+}
+
+/**
+ * Build the top-level "call window" URL: the SAME hosted panel, carrying the SAME dynamic
+ * acsGroupId so the pop-out joins the exact ACS group the customer (and the embedded tab) joined.
+ *
+ * Security: this URL never contains a token or any secret. ACS access tokens are minted at runtime
+ * by the relay `/api/token` endpoint inside the pop-out; only the (non-secret) group GUID and
+ * display-only routing hints travel on the query string. No static/hardcoded group is ever used —
+ * if acsGroupId is empty the caller must not open the window.
+ */
+export function buildCallWindowUrl(ctx: CallWindowContext): string {
+  const origin = window.location.origin;
+  const path = window.location.pathname;
+  const params = new URLSearchParams();
+  params.set("mode", ctx.mode || "live");
+  // surface=tab makes the pop-out act as the media stage (it joins the call); popout=1 marks it as
+  // the top-level publishing window so the UI can adjust its messaging.
+  params.set("surface", "tab");
+  params.set("popout", "1");
+  params.set("acsGroupId", ctx.acsGroupId);
+  params.set("requestedMedia", ctx.requestedMedia);
+  if (ctx.sessionRef) params.set("sessionRef", ctx.sessionRef);
+  return `${origin}${path}?${params.toString()}`;
+}

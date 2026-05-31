@@ -79,6 +79,7 @@ function initialSnapshot(ctx: AvContext): SessionSnapshot {
     mode: ctx.mode,
     requestedMedia: ctx.requestedMedia,
     sessionRef: ctx.sessionRef,
+    acsGroupId: ctx.acsGroupId,
     message: {
       severity: "info",
       text: `Mock mode — ${ctx.requestedMedia} interaction${refNote}. No real ACS call is placed.`
@@ -299,6 +300,7 @@ export class RealMediaSession implements IMediaSession {
       mode: this.ctx.mode,
       requestedMedia: this.ctx.requestedMedia,
       sessionRef: this.ctx.sessionRef,
+      acsGroupId: this.config.groupId,
       message: this.hasSessionContext()
         ? {
             severity: "info",
