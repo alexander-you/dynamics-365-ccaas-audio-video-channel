@@ -209,6 +209,47 @@ approval checklist — so the actual POC is reviewable and explicitly approved f
 
 ---
 
+## Hosting strategy & migration plan (panel: GitHub Pages → Azure)
+
+> **Planning only.** No Azure resources are provisioned and the CIF Channel URL is **not** changed by
+> this section. This is the agreed direction; provisioning happens only after explicit approval.
+
+### Strategy
+
+1. **GitHub Pages = temporary POC hosting only.** It hosts the mock/live panel
+   (`https://alexander-you.github.io/dynamics-365-ccaas-audio-video-channel/?mode=live`) for early CIF
+   provider/widget validation. It is **not** the target hosting model.
+2. **MVP hosting = Azure Static Web Apps (preferred)** unless a concrete technical limitation forces
+   otherwise. SWA gives a global CDN, built-in HTTPS/custom domains, GitHub-native CI/CD, and staging
+   environments at low cost.
+3. **Alternatives (if SWA is unsuitable):**
+   - **Azure Storage static website** — simplest/lowest-cost static hosting (pair with Azure CDN/Front
+     Door for custom domain + headers). Good when only static file serving is needed.
+   - **Azure App Service** — when enterprise controls are needed: custom response headers (CSP /
+     `Permissions-Policy`), built-in auth, managed identity, deployment slots, VNet integration, and a
+     co-located backend/token proxy.
+4. **Production: GitHub Pages must NOT be used.** Production hosting must be Azure-based, aligned with
+   the rest of the Azure footprint (ACS, Functions, storage) for identity, network, custom domain, and
+   governance.
+
+### Migration plan — GitHub Pages → Azure Static Web Apps
+
+| Step | Action |
+|---|---|
+| **Required Azure resource** | One **Azure Static Web App** (Standard tier recommended for SLA, custom auth, and BYO-functions; Free tier acceptable for MVP validation) in the existing `rg-acv-byoc-poc` (or a dedicated RG), same subscription/tenant as the relay. |
+| **Deployment flow from GitHub** | Replace the current Pages workflow with the **Azure/static-web-apps-deploy** GitHub Action. Build `src/agent-media-panel` (`npm ci`, `npm run typecheck`, `npm run build`, `VITE_USE_MOCKS=true`), `app_location: src/agent-media-panel`, `output_location: dist`. Auth via the SWA **deployment token** (GitHub secret) or OIDC. PR builds get free **preview environments**. |
+| **Environment variables** | Build-time `VITE_*` only (e.g. `VITE_TOKEN_URL`); set as Action env or SWA build config. **No secrets in the bundle.** Runtime config (ACS tokens) continues to come from the relay `/api/token`, not from SWA. |
+| **Custom domain** | Optionally map a custom domain (e.g. `acv.<org>.com`) in SWA → add DNS CNAME/TXT, SWA auto-provisions the managed TLS cert. The custom origin becomes the new CIF Trusted domain. |
+| **CIF Channel URL update process** | After the SWA origin is verified, update the `msdyn_channelprovider` record: `msdyn_channelurl` → `https://<swa-host>/?mode=live` and `msdyn_trusteddomain` → `https://<swa-host>`. Keep `msdyn_customparams = { "mode": "live" }` (still no `acsGroupId`). Re-run the §10.5 validation checklist. |
+| **Rollback plan** | Keep the GitHub Pages deployment live during cutover. If the SWA origin fails validation, revert `msdyn_channelurl` / `msdyn_trusteddomain` back to the GitHub Pages origin (single Dataverse PATCH) — no code change needed. Decommission Pages only after SWA is validated and stable. |
+| **Security considerations** | Enforce HTTPS-only; set CSP / `Permissions-Policy` (delegate `camera; microphone; display-capture; autoplay` for the iframe) via SWA `staticwebapp.config.json`; restrict `frame-ancestors` to the D365 host; no secrets in the bundle or CIF config; use OIDC for the deploy identity where possible. |
+| **Cost impact** | SWA **Free** tier = $0 (sufficient for MVP validation); **Standard** ≈ low monthly fixed cost per app (for SLA, custom auth, BYO-functions, more custom domains). Negligible vs. ACS/Functions spend. Storage-static-website + Front Door would add CDN/Front Door cost; App Service adds a plan cost — choose SWA unless those features are required. |
+
+> **Decision gate:** provisioning the SWA, wiring the deploy Action, and updating the CIF Channel URL
+> are **separate approvals**. This plan does not execute any of them.
+
+---
+
 ## Versioning policy
 
 Every meaningful release updates: `README.md`, `CHANGELOG.md`, this file, the Power Platform
