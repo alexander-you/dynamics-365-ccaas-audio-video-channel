@@ -24,6 +24,29 @@ this is understood.
   participant appeared (two "Agent" endpoints: the embedded tab + the pop-out). This points at two
   separate problems that must not be conflated — see §6.
 
+### 0.1 CONFIRMED live reading (2026-05-31, in-tab Media diagnostics)
+
+| Diagnostic | Value |
+|---|---|
+| Camera permission | **denied** |
+| Microphone permission | **denied** |
+| getUserMedia | **failed** |
+| LocalVideoStream created | Yes |
+| startVideo | success |
+| Local preview rendered | **No** |
+| Video published to ACS | Yes |
+| Browser error | `NotAllowedError: Permission denied` |
+| Permissions Policy | `NotAllowedError: Permission denied (likely the Dynamics app-tab iframe missing allow="camera; microphone")` |
+
+**Conclusion: the iframe Permissions-Policy hypothesis (§2) is CONFIRMED.** `getUserMedia` is denied
+inside the embedded Dynamics app-tab iframe, with camera/mic permission `denied` and a `NotAllowedError`.
+
+**Important caveat on "startVideo: success" / "Video published to ACS: Yes":** these do **not** mean
+frames are flowing. The ACS SDK accepted a `LocalVideoStream` and attached it to the call, but because
+`getUserMedia` was denied there are **no camera frames** — which is exactly why `Local preview
+rendered = No` and the customer's Agent tile is **black**. "Published" here means *a stream object is
+on the call*, not *media is being transmitted*. This is the precise root cause of the black tile.
+
 ---
 
 ## 1. Why camera publishing fails inside the current Dynamics tab
@@ -62,16 +85,16 @@ same panel opened top-level (debug pop-out or standalone) should read **getUserM
 
 ## 2. Is the limitation caused by iframe Permissions Policy?
 
-**Almost certainly yes — pending one confirmation from the diagnostics.** The signature is:
+**CONFIRMED — yes** (live reading §0.1). The signature is exactly as predicted:
 
 - receive-only works (no `getUserMedia` needed), publish fails;
-- the failure surfaces as `NotAllowedError` even though the OS/browser has granted camera access to
-  the site at top level;
-- the same code publishes fine when the panel is loaded **top-level** (not in the Dynamics iframe).
+- the failure surfaces as `NotAllowedError: Permission denied`, with camera/mic permission `denied`
+  **inside the iframe**, even though the OS/browser grants camera access to the site at top level;
+- `getUserMedia = failed` in the tab; the same code publishes fine when the panel is loaded
+  **top-level** (not in the Dynamics iframe).
 
-If the diagnostics show `getUserMedia = success` **inside** the tab but `startVideo` still fails, the
-cause is **not** Permissions Policy and we re-open the ACS-client hypothesis (§4). The diagnostics are
-designed to make this distinction unambiguous.
+The diagnostics ruled out the alternative: this is **not** a case of `getUserMedia = success` in-tab
+with a later `startVideo` failure, so the ACS-client hypothesis (§4) stays secondary.
 
 **It is not:**
 
