@@ -5,6 +5,7 @@
 import type { IMediaSession } from "./mediaSession";
 import type { SessionSnapshot, RecordingStatus, ConsentStatus } from "./types";
 import { CifBridge, makeMockIncoming, type CifStatus } from "./cif";
+import { isEmbeddedIframe, buildCallWindowUrl } from "./context";
 
 const RECORDING_LABELS: Record<RecordingStatus, string> = {
   "not-recording": "Not recording",
@@ -27,6 +28,14 @@ export class AgentPanel {
   private cif: CifBridge;
   private cifStatus: CifStatus;
   private lastIncoming = "";
+
+  // Call-window (pop-out) state. The embedded Dynamics tab can RECEIVE video but usually cannot
+  // PUBLISH camera/mic (the app-tab iframe Permissions Policy blocks getUserMedia), so the agent
+  // publishes from a top-level pop-out window that joins the same dynamic ACS group.
+  private readonly embedded = isEmbeddedIframe();
+  private callWindow: Window | null = null;
+  private callWindowNote = "";
+  private callWindowBlocked = false;
 
   constructor(root: HTMLElement, session: IMediaSession, cif: CifBridge = new CifBridge()) {
     this.root = root;
@@ -122,6 +131,8 @@ export class AgentPanel {
         ${s.isMock ? `<p class="muted">Mock mode shows no live video. Run with <code>VITE_USE_MOCKS=false</code> for real ACS video.</p>` : ""}
       </section>
 
+      ${this.renderCallWindow(s)}
+
       <section class="amp-cif" aria-label="Dynamics 365 workspace (CIF v2)">
         <h2>Dynamics 365 workspace (CIF v2)</h2>
         <p class="muted">${esc(this.cifStatus.label)}. ${
@@ -171,6 +182,51 @@ export class AgentPanel {
     </div>`;
   }
 
+  /**
+   * Camera/microphone publishing section. POC media-hosting pattern:
+   *   "D365 embedded tab for context and control, top-level pop-out window for camera/microphone
+   *    publishing when iframe permissions block WebRTC capture."
+   * The embedded Dynamics tab can receive video and drive context/roster/consent/recording, but the
+   * agent publishes camera+mic from a top-level pop-out that joins the SAME dynamic ACS group. No
+   * static group is used and no token/secret is placed on the URL.
+   */
+  private renderCallWindow(s: SessionSnapshot): string {
+    if (s.isMock) return "";
+    const groupId = (s.acsGroupId ?? "").trim();
+    if (groupId === "") return ""; // No session context yet → nothing to publish into.
+
+    const note = this.callWindowNote
+      ? `<div class="amp-message msg-${this.callWindowBlocked ? "warning" : "info"}">
+           <span>${esc(this.callWindowNote)}</span>
+         </div>`
+      : "";
+
+    if (this.embedded) {
+      return `
+      <section class="amp-callwindow" aria-label="Camera and microphone publishing">
+        <h2>Camera &amp; microphone</h2>
+        <p class="muted">
+          This embedded Dynamics tab handles context, roster, consent and recording status, and can
+          show the customer's video. Camera/microphone capture is usually blocked inside the Dynamics
+          tab (iframe permissions policy), so publish your camera and microphone from a separate
+          top-level window that joins the same call.
+        </p>
+        <div class="btn-row">
+          <button data-callwindow="open" class="primary">Open call window</button>
+        </div>
+        ${note}
+        <p class="muted">The call window joins the same session (group <code>${esc(groupId)}</code>). No static group and no tokens are placed on the URL.</p>
+      </section>`;
+    }
+
+    // Top-level (pop-out / standalone) window: this IS the publishing endpoint.
+    return `
+      <section class="amp-callwindow" aria-label="Camera and microphone publishing">
+        <h2>Camera &amp; microphone</h2>
+        <p class="muted">You are in the standalone call window — camera and microphone publish from here. Keep the Dynamics tab open for context, roster, consent and recording status.</p>
+      </section>`;
+  }
+
   private bind(): void {
     this.root.querySelectorAll<HTMLButtonElement>("button[data-action]").forEach((btn) => {
       btn.addEventListener("click", () => this.onAction(btn.dataset.action!));
@@ -181,6 +237,68 @@ export class AgentPanel {
     this.root.querySelectorAll<HTMLButtonElement>("button[data-cif]").forEach((btn) => {
       btn.addEventListener("click", () => this.onCif(btn.dataset.cif!));
     });
+    this.root.querySelectorAll<HTMLButtonElement>("button[data-callwindow]").forEach((btn) => {
+      btn.addEventListener("click", () => this.openCallWindow());
+    });
+  }
+
+  /**
+   * Open the top-level call window: a new browser window loading the SAME hosted panel, carrying the
+   * SAME dynamic acsGroupId so it joins the customer's ACS group. Because it is top-level (not an
+   * iframe), it can publish the agent camera and microphone. The token is fetched at runtime by the
+   * pop-out from the relay — it is never placed on the URL. If the browser blocks the pop-up, guide
+   * the agent to allow pop-ups and try again.
+   */
+  private openCallWindow(): void {
+    const s = this.session.getSnapshot();
+    const groupId = (s.acsGroupId ?? "").trim();
+    if (groupId === "") {
+      this.callWindowBlocked = false;
+      this.callWindowNote =
+        "No audio/video session context (acsGroupId) is available yet. Wait for the conversation to provide one, then open the call window.";
+      this.render(s);
+      return;
+    }
+
+    // Re-focus an already-open call window instead of spawning another endpoint.
+    if (this.callWindow && !this.callWindow.closed) {
+      try {
+        this.callWindow.focus();
+      } catch {
+        /* cross-window focus may be blocked; ignore */
+      }
+      this.callWindowBlocked = false;
+      this.callWindowNote =
+        "Call window is already open. Publish your camera and microphone from that window.";
+      this.render(s);
+      return;
+    }
+
+    const url = buildCallWindowUrl({
+      acsGroupId: groupId,
+      mode: s.mode,
+      requestedMedia: s.requestedMedia,
+      sessionRef: s.sessionRef
+    });
+    const win = window.open(url, "acvCallWindow", "width=1120,height=820,resizable=yes,scrollbars=yes");
+
+    if (!win || win.closed || typeof win.closed === "undefined") {
+      this.callWindow = null;
+      this.callWindowBlocked = true;
+      this.callWindowNote =
+        'The browser blocked the call window pop-up. Allow pop-ups for this site, then click "Open call window" again.';
+    } else {
+      this.callWindow = win;
+      this.callWindowBlocked = false;
+      this.callWindowNote =
+        "Call window opened. Publish your camera and microphone from that window. Keep this Dynamics tab open for context, roster, consent and recording status.";
+      try {
+        win.focus();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.render(s);
   }
 
   private async onAction(action: string): Promise<void> {

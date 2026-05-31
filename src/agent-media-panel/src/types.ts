@@ -64,5 +64,11 @@ export interface SessionSnapshot {
   requestedMedia: RequestedMedia;
   /** Correlation reference from the relay (conversationrequestid / sessionRef). */
   sessionRef: string;
+  /**
+   * Resolved ACS group-call GUID for THIS session (the same group the customer joined). Empty when
+   * no session context is available yet. Surfaced so the UI can build the top-level "call window"
+   * pop-out URL with the SAME dynamic group (never a static group, never a token/secret).
+   */
+  acsGroupId: string;
   message?: PanelMessage;
 }

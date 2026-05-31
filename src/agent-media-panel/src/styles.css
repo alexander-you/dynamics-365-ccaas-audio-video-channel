@@ -239,6 +239,18 @@ button.danger:hover:not(:disabled) {
   color: var(--danger);
 }
 
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+  color: #fff;
+}
+
 button[aria-pressed="true"] {
   background: #eaf2fb;
   border-color: var(--accent);
