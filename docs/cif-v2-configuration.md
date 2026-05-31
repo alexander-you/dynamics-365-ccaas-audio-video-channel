@@ -297,3 +297,41 @@ widget does not appear, validate in order; the first failing item is almost alwa
 > validated from the browser devtools console while signed in as the test agent. The widget-side
 > wiring for item 5 ships in the hosted build (`CifBridge.revealPanel()`); items 8–9 ship in the
 > dynamic-`acsGroupId` / waiting-state logic (`mediaSession.ts`).
+
+### 10.6 Verified finding (2026-05-31) — agent sees chat, not the A/V widget
+
+**Observed:** live end-to-end test. Customer connects to the ACS call and waits; the routed
+conversation arrives in the agent workspace and the **Communication Panel shows the chat**, while the
+custom A/V video widget does **not** appear in that panel. The customer's "Agent" video tile stays
+black (no agent has joined the group).
+
+**Root cause (confirmed via Dataverse):** `alex_inbox` has **two** channel providers attached
+(`msdyn_appconfig_msdyn_channelprovider`):
+
+1. `alex_acvprovider_poc` — our custom A/V widget (`…?mode=live`).
+2. `omnichannel` — the **built-in Omnichannel conversation control** (`…/convcontrol/ChatControl.htm`).
+
+During an active routed conversation the **Omnichannel provider owns the Communication Panel** and
+renders the chat. This is the confirmed limitation from item 4 above and from
+[known-limitations.md](known-limitations.md) (R1/R2): a custom A/V channel **cannot reuse or render
+inside the native communication panel**; CIF v2 "doesn't manage call or chat sessions." So the custom
+widget is registered and loadable, but it does not get the comms panel while the OC conversation is
+focused — it surfaces on the **Home / provider-owned session**, not inside the conversation tab.
+
+**Two gaps to close the experience (both planned, not yet built):**
+
+- **Surface:** give the agent A/V widget its own visible host **independent of the OC comms panel** —
+  an **Application tab / App side pane** opened in the agent session when the A/V conversation arrives
+  (see [d365-agent-workspace-integration.md](d365-agent-workspace-integration.md) §"App session tab").
+  This needs new session/app-profile configuration (a **session template** application tab or a
+  productivity/agent-script action) — **out of the previously approved narrow scope; requires
+  explicit approval before creation.**
+- **Context flow:** the relay **already** writes `acsGroupId` into the conversation `conversationcontext`
+  (the customer page sends it — [customer-web `main.ts`](../src/customer-web/src/main.ts)). The
+  agent-side surface must **read `acsGroupId` from the active conversation** and open the panel with it
+  so the agent joins the **same** ACS group. Until this is wired, the agent panel (even when visible)
+  stays in the safe **waiting state** and never joins, so the customer's Agent tile stays black.
+
+> **What this confirms:** routing/messaging works end-to-end (chat = routed OC conversation) and the
+> media plane works (customer connected). The remaining work is **agent-side surfacing + context
+> flow**, not a provider-registration or media bug.
