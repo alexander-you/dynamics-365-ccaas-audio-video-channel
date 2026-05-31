@@ -304,9 +304,9 @@ a Permissions-Policy block is likely. It never calls ACS, Dataverse data APIs, s
 
 Click **Run capture test** in each and record the diagnostics.
 
-**RESULT (live run, 2026-05-31).** First live run completed for the **top-level** test (test 2). The
-camera/microphone test requires a real device + user gesture in an authenticated browser session and
-cannot be executed headlessly.
+**RESULT (live runs, 2026-05-31).** The top-level test (test 2) was run twice: first with the camera
+held by another process (`NotReadableError`), then again with the camera free — **clean success**. The
+app-shell test (test 1) still needs a live run.
 
 | Diagnostic | App-shell (test 1) | Top-level (test 2) |
 |---|---|---|
@@ -315,26 +315,23 @@ cannot be executed headlessly.
 | Permissions-Policy allows microphone | _tbd_ | **Yes** |
 | Camera permission | _tbd_ | **granted** |
 | Microphone permission | _tbd_ | **granted** |
-| getUserMedia | _tbd_ | **FAILED** |
-| Local preview created | _tbd_ | **No** |
-| Permissions Policy blocking | _tbd_ | **No / inconclusive** |
-| Exact error (name + message) | _tbd_ | **`NotReadableError: Device in use`** |
+| getUserMedia | _tbd_ | **SUCCESS** |
+| Local preview created | _tbd_ | **Yes** |
+| Permissions Policy blocking | _tbd_ | **No — capture succeeded** |
+| Exact error (name + message) | _tbd_ | _(none — first run was `NotReadableError: Device in use` = device contention; cleared on re-run)_ |
 
-**Reading of the first result (decisive):** on the same-origin Dynamics origin, **Permissions-Policy
-allows camera + microphone**, both permissions are **granted**, and the failure was
-**`NotReadableError: Device in use`** — *not* `NotAllowedError` and *not* a Permissions-Policy block.
-`NotReadableError` means the OS/browser **could not open the hardware because another process already
-holds it** (e.g. a live ACS call in another tab/window, Teams, or another browser tab). This is
-**device contention, not a policy denial.** It is strong positive evidence that a **same-origin
-Dynamics surface is _not_ blocked from camera/microphone at the document-policy level** — the exact
-opposite of the cross-origin app-tab, which returned `NotAllowedError: Permission denied`.
+**Reading of the top-level result (confirmed):** on the same-origin Dynamics origin, a custom HTML
+surface **can fully capture camera + microphone** — `getUserMedia({video,audio})` **succeeded** and a
+**local preview rendered**. The earlier `NotReadableError: Device in use` was pure **device
+contention** (camera held by another tab/app), not a policy denial; freeing the device produced a clean
+success. This is the **opposite** of the cross-origin app-tab (`NotAllowedError: Permission denied`)
+and confirms the Dynamics origin's document policy does **not** disable capture.
 
-**Next two reads still needed to close this out:**
-1. **Re-run the top-level test with the camera free** (close any live call / other tab / Teams using
-   the camera) → expect `getUserMedia` to **succeed** and a local preview to render. This confirms the
-   `NotReadableError` was pure contention.
-2. **Run the app-shell test (test 1)** so the `Inside iframe = Yes` row is filled — this is the one
-   that mirrors the real embedded workspace document policy.
+**One read still needed to close this out:**
+- **Run the app-shell test (test 1)** so the `Inside iframe = Yes` row is filled —
+  `…/main.aspx?pagetype=webresource&webresourceName=alex_acv_capture_probe.html`. This mirrors the real
+  embedded workspace document policy and is the decisive read for **PCF / web-resource-on-a-form**
+  viability. (Free the camera first so contention doesn't mask the result.)
 
 **Interpretation rules (decided in advance, to avoid bias):**
 
