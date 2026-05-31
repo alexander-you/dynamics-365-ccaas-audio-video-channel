@@ -261,3 +261,90 @@ Per instruction, **stop here and await approval.** Summary of the five required 
    tracks immediately, reads the same diagnostics) — **pending your approval to create one web
    resource**. No PCF build, no Azure, no schema, no routing changes until the probe + Microsoft answers
    are in.
+
+---
+
+## 11. Probe APPROVED + DEPLOYED (2026-05-31) — `alex_acv_capture_probe.html`
+
+> **Status:** the same-origin capture probe (step 1) was **approved and created**. This is the only
+> change made: **one HTML web resource**, additive and unbound. No ACS, no Dataverse writes from the
+> probe, no storage, no tokens, no secrets; no routing / workstream / queue / app-profile / session-
+> template / capacity change; no Azure provisioning; nothing bound to navigation or any template.
+
+**What was created**
+
+| Item | Value |
+|---|---|
+| Component | HTML web resource (`webresourcetype = 1`) |
+| Name | `alex_acv_capture_probe.html` |
+| Web resource id | *(per-environment GUID; resolve by name — not committed to the public repo)* |
+| Solution | `alex_visual_engagement_channel` (unmanaged, prefix `alex`) |
+| Environment | **Demo Contact Center EN** only (`demo-contact-center-en.crm4.dynamics.com`) — Demo Contact Center HE untouched |
+| Source of truth | [dataverse/webresources/alex_acv_capture_probe.html](../dataverse/webresources/alex_acv_capture_probe.html) |
+| Deploy script | [scripts/deploy-capture-probe.ps1](../scripts/deploy-capture-probe.ps1) (create/update + publish) |
+
+**What the probe does** — displays origin, iframe status, "inside Dynamics" detection, secure-context,
+and `document.featurePolicy.allowsFeature('camera'|'microphone')`; runs `navigator.permissions.query`
+for camera/microphone on load (no prompt); and on an explicit **button click** runs one guarded
+`getUserMedia({ video: true, audio: true })`, renders a local preview if possible, then **stops all
+tracks immediately**. It reports getUserMedia success/failure, exact error name + message, and whether
+a Permissions-Policy block is likely. It never calls ACS, Dataverse data APIs, storage, or tokens.
+
+**How to test (no binding required — both are safe, reversible launch methods)**
+
+1. **Inside the model-driven app shell (recommended — closest to the real embedded surface):** while
+   signed in to the workspace app, open
+   `https://demo-contact-center-en.crm4.dynamics.com/main.aspx?pagetype=webresource&webresourceName=alex_acv_capture_probe.html`
+   — this hosts the web resource in the app's content frame (same origin) without adding it to any
+   site map, form, or session template.
+2. **Direct top-level (control comparison):**
+   `https://demo-contact-center-en.crm4.dynamics.com/WebResources/alex_acv_capture_probe.html` — loads
+   the same page top-level on the Dynamics origin. Comparing (1) vs (2) isolates whether the **app
+   shell frame** (sandbox / document policy) changes the result versus a plain same-origin page.
+
+Click **Run capture test** in each and record the diagnostics.
+
+**RESULT: ⏳ awaiting live run.** The camera/microphone test requires a real device + user gesture in an
+authenticated browser session and cannot be executed headlessly. The values below are to be filled in
+from the live run:
+
+| Diagnostic | App-shell (test 1) | Top-level (test 2) |
+|---|---|---|
+| Inside iframe | _tbd_ | _tbd_ |
+| Permissions-Policy allows camera | _tbd_ | _tbd_ |
+| Permissions-Policy allows microphone | _tbd_ | _tbd_ |
+| Camera permission | _tbd_ | _tbd_ |
+| Microphone permission | _tbd_ | _tbd_ |
+| getUserMedia | _tbd_ | _tbd_ |
+| Local preview created | _tbd_ | _tbd_ |
+| Permissions Policy blocking | _tbd_ | _tbd_ |
+| Exact error (name + message) | _tbd_ | _tbd_ |
+
+**Interpretation rules (decided in advance, to avoid bias):**
+
+- **If getUserMedia SUCCEEDS in the app shell (test 1):** same-origin Dynamics hosting **can** access
+  camera/microphone → proceed to a **PCF or web-resource media host**; the cross-origin app-tab was the
+  only blocker. PCF becomes the recommended product surface.
+- **If it FAILS in the app shell but SUCCEEDS top-level (test 2):** the **app shell frame**
+  (sandbox / document Permissions-Policy) is the blocker even same-origin → escalate to Microsoft
+  (validation §7 item 1/3); a raw web resource on a form may not be enough; re-scope.
+- **If it FAILS in both:** the **browser/OS or the Dynamics origin's document policy** blocks capture →
+  strong evidence the workspace document-level policy disables camera/microphone for custom surfaces →
+  **Microsoft validation is mandatory** before any PCF build.
+
+**Rollback (one step):** delete the web resource and publish.
+
+```powershell
+# Remove the probe (Demo Contact Center EN). Requires an authenticated pac/az session.
+$dv = "https://demo-contact-center-en.crm4.dynamics.com"
+$tok = az account get-access-token --resource $dv --query accessToken -o tsv
+$h = @{ Authorization = "Bearer $tok"; Accept = "application/json" }
+$wr = Invoke-RestMethod -Headers $h `
+  -Uri "$dv/api/data/v9.2/webresourceset?`$filter=name eq 'alex_acv_capture_probe.html'&`$select=webresourceid"
+$id = $wr.value[0].webresourceid
+Invoke-RestMethod -Method Delete -Headers $h -Uri "$dv/api/data/v9.2/webresourceset($id)"
+# then PublishXml the deletion
+```
+
+The probe is **not** referenced by any site map, form, dashboard, ribbon, session template, or app
+profile, so deleting it changes no other behavior.

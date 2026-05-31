@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ACV camera/mic capture probe</title>
+  <!--
+    alex_acv_capture_probe.html — minimal, reversible same-origin capture probe.
+    PURPOSE: test ONLY whether camera/microphone capture works from a same-origin
+    Dynamics 365 web-resource surface. It does NOT call ACS, does NOT call Dataverse
+    APIs, does NOT store data, does NOT request tokens, and uses NO secrets.
+    getUserMedia runs only after an explicit user click and all tracks are stopped
+    immediately after the test.
+  -->
+  <style>
+    :root {
+      --bg: #faf9f8; --fg: #201f1e; --muted: #605e5c; --line: #edebe9;
+      --good: #107c10; --bad: #a4262c; --warn: #797673; --accent: #0f6cbd;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    p.sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; margin-bottom: 14px; }
+    .card h2 { font-size: 14px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; word-break: break-word; }
+    .ok { color: var(--good); font-weight: 600; }
+    .bad { color: var(--bad); font-weight: 600; }
+    .warn { color: var(--warn); font-weight: 600; }
+    button { font: inherit; background: var(--accent); color: #fff; border: 0; border-radius: 4px; padding: 8px 16px; cursor: pointer; }
+    button:disabled { background: #c8c6c4; cursor: default; }
+    .err { background: #fde7e9; border: 1px solid #f3d4d6; border-radius: 4px; padding: 8px 10px; font-size: 13px; margin-top: 10px; white-space: pre-wrap; }
+    video { width: 220px; height: 140px; background: #000; border-radius: 4px; margin-top: 10px; display: none; }
+    code { background: #f3f2f1; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+    .foot { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Audio/Video capture probe</h1>
+    <p class="sub">Same-origin Dynamics 365 web resource. Tests camera/microphone capture only. No ACS, no Dataverse writes, no storage, no tokens.</p>
+
+    <div class="card">
+      <h2>Environment</h2>
+      <dl>
+        <dt>Origin</dt><dd id="origin">—</dd>
+        <dt>Inside an iframe</dt><dd id="iframe">—</dd>
+        <dt>Running inside Dynamics</dt><dd id="indynamics">—</dd>
+        <dt>Parent origin</dt><dd id="parentorigin">—</dd>
+        <dt>Secure context (HTTPS)</dt><dd id="secure">—</dd>
+        <dt>Permissions-Policy allows camera</dt><dd id="ppcamera">—</dd>
+        <dt>Permissions-Policy allows microphone</dt><dd id="ppmic">—</dd>
+      </dl>
+    </div>
+
+    <div class="card">
+      <h2>Capture test</h2>
+      <p class="sub" style="margin-bottom:10px">Click to run a one-time <code>getUserMedia({ video: true, audio: true })</code>. Tracks are stopped immediately after.</p>
+      <button id="run">Run capture test</button>
+      <video id="preview" autoplay muted playsinline></video>
+      <dl style="margin-top:14px">
+        <dt>Camera permission</dt><dd id="camperm">not queried</dd>
+        <dt>Microphone permission</dt><dd id="micperm">not queried</dd>
+        <dt>getUserMedia</dt><dd id="gum">not attempted</dd>
+        <dt>Local preview created</dt><dd id="preview-ok">No</dd>
+        <dt>Permissions Policy blocking</dt><dd id="ppblock">unknown</dd>
+      </dl>
+      <div id="errbox" class="err" style="display:none"></div>
+    </div>
+
+    <p class="foot">Component: <code>alex_acv_capture_probe.html</code> · diagnostic only · safe to delete.</p>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      function set(id, text, cls) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text;
+        el.className = cls || "";
+      }
+
+      // --- Environment ---
+      set("origin", window.location.origin);
+      set("secure", window.isSecureContext ? "Yes" : "No", window.isSecureContext ? "ok" : "bad");
+
+      var inIframe;
+      try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
+      set("iframe", inIframe ? "Yes" : "No");
+
+      // Best-effort "inside Dynamics" detection (same-origin host or referrer).
+      var inDynamics = false;
+      var parentOrigin = "unknown (cross-origin or top-level)";
+      try {
+        if (window.location.host.indexOf("dynamics.com") !== -1 ||
+            window.location.host.indexOf(".crm") !== -1) {
+          inDynamics = true;
+        }
+        if (inIframe && document.referrer) {
+          var ref = new URL(document.referrer);
+          parentOrigin = ref.origin;
+          if (ref.host.indexOf("dynamics.com") !== -1 || ref.host.indexOf(".crm") !== -1) {
+            inDynamics = true;
+          }
+        } else if (!inIframe) {
+          parentOrigin = "n/a (top-level)";
+        }
+      } catch (e) { /* referrer may be blocked */ }
+      set("indynamics", inDynamics ? "Yes" : "Unknown", inDynamics ? "ok" : "warn");
+      set("parentorigin", parentOrigin);
+
+      // --- Permissions-Policy introspection (where supported) ---
+      function policyAllows(feature) {
+        try {
+          var fp = document.featurePolicy || document.permissionsPolicy;
+          if (fp && typeof fp.allowsFeature === "function") {
+            return fp.allowsFeature(feature);
+          }
+        } catch (e) { /* not supported */ }
+        return null; // unknown
+      }
+      function renderPolicy(id, allowed) {
+        if (allowed === null) { set(id, "unknown (API unavailable)", "warn"); }
+        else { set(id, allowed ? "Yes" : "No", allowed ? "ok" : "bad"); }
+      }
+      var camAllowed = policyAllows("camera");
+      var micAllowed = policyAllows("microphone");
+      renderPolicy("ppcamera", camAllowed);
+      renderPolicy("ppmic", micAllowed);
+
+      // --- Permissions API query (read-only, no prompt) ---
+      function queryPerm(name, id) {
+        if (!navigator.permissions || !navigator.permissions.query) {
+          set(id, "Permissions API unavailable", "warn");
+          return Promise.resolve();
+        }
+        return navigator.permissions.query({ name: name })
+          .then(function (status) {
+            var cls = status.state === "granted" ? "ok" : (status.state === "denied" ? "bad" : "warn");
+            set(id, status.state, cls);
+          })
+          .catch(function (err) {
+            set(id, "query failed: " + err.name, "warn");
+          });
+      }
+
+      // --- Capture test (only on click) ---
+      var btn = document.getElementById("run");
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        set("gum", "running…", "warn");
+        var errbox = document.getElementById("errbox");
+        errbox.style.display = "none";
+        errbox.textContent = "";
+
+        // Refresh permission states first (best-effort).
+        Promise.all([queryPerm("camera", "camperm"), queryPerm("microphone", "micperm")])
+          .then(function () {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+              throw Object.assign(new Error("navigator.mediaDevices.getUserMedia is unavailable on this surface"), { name: "NotSupportedError" });
+            }
+            return navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          })
+          .then(function (stream) {
+            set("gum", "SUCCESS", "ok");
+
+            // Try to render a local preview, then stop everything immediately.
+            var ok = false;
+            try {
+              var v = document.getElementById("preview");
+              v.srcObject = stream;
+              v.style.display = "block";
+              ok = true;
+            } catch (e) { ok = false; }
+            set("preview-ok", ok ? "Yes" : "No", ok ? "ok" : "warn");
+            set("ppblock", "No — capture succeeded", "ok");
+
+            // Immediately stop all tracks (do not hold camera/mic).
+            stream.getTracks().forEach(function (t) { t.stop(); });
+            // Detach preview shortly after so nothing lingers.
+            setTimeout(function () {
+              try {
+                var v2 = document.getElementById("preview");
+                v2.srcObject = null;
+                v2.style.display = "none";
+              } catch (e) { /* noop */ }
+              btn.disabled = false;
+            }, 1500);
+          })
+          .catch(function (err) {
+            set("gum", "FAILED", "bad");
+            set("preview-ok", "No", "warn");
+            var name = (err && err.name) || "Error";
+            var msg = (err && err.message) || String(err);
+            var policyBlocked = /permissions policy|permission policy|disallowed by permissions|feature is not enabled/i.test(msg) ||
+                                (name === "NotAllowedError" && inIframe);
+            set("ppblock", policyBlocked ? "Likely YES" : "No / inconclusive", policyBlocked ? "bad" : "warn");
+            var errbox2 = document.getElementById("errbox");
+            errbox2.style.display = "block";
+            errbox2.textContent =
+              "Error name: " + name + "\n" +
+              "Error message: " + msg +
+              (policyBlocked
+                ? "\n\nThis looks like a Permissions-Policy block. If this surface is same-origin and still blocked, the workspace document-level policy likely disables camera/microphone."
+                : "");
+            btn.disabled = false;
+          });
+      });
+
+      // Run read-only permission queries on load (no prompt).
+      queryPerm("camera", "camperm");
+      queryPerm("microphone", "micperm");
+    })();
+  </script>
+</body>
+</html>

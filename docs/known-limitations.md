@@ -78,6 +78,12 @@ supportability validation. These are first-class workstreams, not afterthoughts.
   page's own policy rather than a denied cross-origin delegation. Feasibility is a **grounded
   hypothesis pending a same-origin probe + Microsoft validation** — see
   [workspace-media-surface-spike.md](workspace-media-surface-spike.md). **[Validate]**
+- **Same-origin capture probe DEPLOYED (2026-05-31):** a minimal, unbound HTML web resource
+  `alex_acv_capture_probe.html` was created in **Demo Contact Center EN** (solution
+  `alex_visual_engagement_channel`) to empirically test whether a same-origin Dynamics surface gets
+  document-level camera/microphone permission. No ACS, no Dataverse writes, no storage/tokens, not
+  bound to navigation or any template. **Live result pending** — see spike §11 for the test URLs,
+  result table, and one-step rollback. **[Validate — probe deployed, awaiting live run]**
 
 ## 6. Co-browsing (future, out of MVP scope)
 

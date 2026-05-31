@@ -71,6 +71,14 @@ profile** (not a production profile). The exact app and profile are confirmed be
 > page's document-level Permissions-Policy. The **pop-out window is rejected** as the agent UX (kept
 > only as a `?debug=1` diagnostic). This reorders the table below: a web resource / PCF is now the
 > media path, not merely an alternative.
+>
+> **Follow-up (2026-05-31) — same-origin probe deployed.** A minimal, unbound HTML web resource
+> `alex_acv_capture_probe.html` was created in **Demo Contact Center EN** (solution
+> `alex_visual_engagement_channel`) to empirically test whether a same-origin Dynamics surface gets
+> document-level camera/microphone permission. It runs a guarded `getUserMedia` that stops tracks
+> immediately, makes no ACS/Dataverse/storage/token calls, and is bound to nothing. **Live result is
+> pending** — see [workspace-media-surface-spike.md §11](workspace-media-surface-spike.md) for the two
+> safe test URLs (app-shell and top-level), the result table, and one-step rollback.
 
 ### 3.1 The CIF v2 channel panel vs an app session tab
 

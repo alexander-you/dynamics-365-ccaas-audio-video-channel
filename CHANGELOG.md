@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Same-origin capture probe web resource (Demo Contact Center EN; reversible)
+- `dataverse/webresources/alex_acv_capture_probe.html`: a minimal, self-contained HTML web resource
+  (no external deps, no ACS, no Dataverse data calls, no storage/tokens/secrets) that reports origin /
+  iframe / "inside Dynamics" / secure-context / `featurePolicy.allowsFeature('camera'|'microphone')`,
+  queries `navigator.permissions` for camera/mic on load (no prompt), and on an explicit button click
+  runs one guarded `getUserMedia({video,audio})`, renders a local preview if possible, then **stops
+  all tracks immediately**. Surfaces getUserMedia success/failure, exact error name+message, and likely
+  Permissions-Policy block. Deployed (and published) to **Demo Contact Center EN** in solution
+  `alex_visual_engagement_channel` via `scripts/deploy-capture-probe.ps1`.
+- `scripts/deploy-capture-probe.ps1`: create/update + publish helper for the probe web resource
+  (az access token → upsert `webresourceset` with `MSCRM.SolutionUniqueName` → `PublishXml`).
+- Updated `docs/workspace-media-surface-spike.md` (new §11: probe deployed, two safe test URLs, result
+  table awaiting live run, decision rules, one-step rollback), `docs/known-limitations.md` (§5a probe-
+  deployed note), `docs/d365-agent-workspace-integration.md` (probe follow-up note).
+
+### Notes (capture probe)
+- **Only one component was added: a single HTML web resource**, additive and unbound. No routing /
+  workstream / queue / app-profile / session-template / capacity change, no Azure provisioning, no
+  navigation/template binding. **Demo Contact Center HE untouched.** The live camera/mic result is
+  **pending** the user's authenticated browser run. Rollback = delete the `webresourceset` record and
+  publish (see spike §11). The pop-out window remains **rejected** (kept only behind `?debug=1`).
+
 ### Added — Workspace media-surface feasibility spike (read-only; docs only)
 - `docs/workspace-media-surface-spike.md`: read-only spike evaluating which Dynamics 365 workspace
   hosting surface can publish camera/microphone for ACS video. Confirms the cross-origin Application
