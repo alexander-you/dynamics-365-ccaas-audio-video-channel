@@ -43,8 +43,31 @@ interface CIFrameworkApi {
   addHandler?(eventName: string, handler: (...args: unknown[]) => void): void;
 }
 
+/**
+ * Minimal shape of the Omnichannel/agent-workspace app-tab API used to surface the Visual
+ * Engagement media stage as its OWN application tab — independent of the native Omnichannel
+ * Communication Panel (which keeps the chat). The host (Customer Service / Contact Center
+ * workspace) provides the real implementation under `Microsoft.Apps` (a.k.a. App profile manager).
+ * Method names vary slightly across host versions, so we probe defensively at runtime.
+ */
+interface AppTabApi {
+  // Opens an application tab from a registered Application Tab Template by its unique name.
+  // The host resolves any {slug} placeholders in the template URL from the ACTIVE conversation /
+  // session context — this is how the dynamic acsGroupId reaches the panel URL declaratively.
+  createTab?(input: Record<string, unknown>): Promise<string>;
+  openTab?(input: Record<string, unknown>): Promise<string>;
+  // Returns the focused session id (used to scope the tab to the conversation's session).
+  getFocusedSession?(): string | Promise<string>;
+}
+
+interface CIFGlobalApps {
+  Apps?: AppTabApi;
+  App?: AppTabApi;
+}
+
+
 interface CIFGlobal {
-  Microsoft?: { CIFramework?: CIFrameworkApi };
+  Microsoft?: ({ CIFramework?: CIFrameworkApi } & CIFGlobalApps);
 }
 
 export type CifMode = "cif" | "standalone";
@@ -70,6 +93,15 @@ function getApi(): CIFrameworkApi | undefined {
   const g = window as unknown as CIFGlobal;
   return g.Microsoft?.CIFramework;
 }
+
+function getAppTabApi(): AppTabApi | undefined {
+  const g = window as unknown as CIFGlobal;
+  // The app-tab API lives on Microsoft.Apps in current workspaces; older builds expose Microsoft.App.
+  return g.Microsoft?.Apps ?? g.Microsoft?.App;
+}
+
+/** Unique name of the Application Tab Template (created in the POC solution) for the media stage. */
+export const MEDIA_TAB_TEMPLATE = "alex_acv_media_tab_poc";
 
 /**
  * CifBridge — thin, defensive wrapper over the CIF v2 client API.
@@ -210,6 +242,43 @@ export class CifBridge {
       log("revealPanel (cif) → setMode(1)", result);
     } catch (err) {
       log("revealPanel (cif) error", err);
+    }
+  }
+
+  /**
+   * Surface the Visual Engagement media stage as its OWN **application tab** in the current agent
+   * session — separate from, and WITHOUT replacing, the native Omnichannel Communication Panel
+   * (which keeps the chat). The tab loads the hosted panel; the dynamic `acsGroupId` reaches it
+   * declaratively via a `{slug}` in the Application Tab Template URL, resolved by the host from the
+   * active conversation context (the relay wrote `acsGroupId` into `conversationcontext`).
+   *
+   * `acsGroupIdOverride` is an optional belt-and-suspenders value passed as a template parameter for
+   * hosts/versions where the URL slug does not resolve a custom conversation-context key; the panel
+   * still falls back to its safe waiting state if neither path yields a group.
+   *
+   * Mock-safe: a no-op (logs only) when the app-tab API is absent (standalone or comms-panel-only
+   * hosts). The exact template binding + slug resolution is validated in the live workspace.
+   */
+  async openMediaTab(acsGroupIdOverride?: string): Promise<string | null> {
+    const apps = getAppTabApi();
+    const open = apps?.createTab ?? apps?.openTab;
+    if (!apps || !open) {
+      log("openMediaTab (unavailable) → skipped (no app-tab API in this frame)");
+      return null;
+    }
+    try {
+      const input: Record<string, unknown> = {
+        templateName: MEDIA_TAB_TEMPLATE,
+        // Template parameters are merged into slug resolution by the host. We pass acsGroupId only
+        // when we already have it; the template URL slug remains the primary mechanism.
+        templateParameters: acsGroupIdOverride ? { acsGroupId: acsGroupIdOverride } : {}
+      };
+      const tabId = await open.call(apps, input);
+      log("openMediaTab (cif) → tabId", tabId);
+      return typeof tabId === "string" ? tabId : "";
+    } catch (err) {
+      log("openMediaTab (cif) error", err);
+      return null;
     }
   }
 

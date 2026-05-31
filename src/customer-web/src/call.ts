@@ -30,12 +30,30 @@ export interface CallController {
   hangUp(): Promise<void>;
 }
 
-// Group GUID the agent panel joins by default; the customer joins the same group.
-const DEFAULT_GROUP_ID = "7a9f5c2e-0b1d-4e6a-9c3f-1a2b3c4d5e6f";
+// ACS group GUID for this call. Resolution (no static demo value):
+//   1. VITE_ACS_GROUP_ID build override (local pinned testing), else
+//   2. a fresh random GUID minted ONCE per page load.
+// The minted id is cached at module scope so every caller in this page (the relay request in
+// main.ts AND the ACS join in RealCallController) uses the SAME group, and it flows customer →
+// relay → conversation context → agent so the agent joins this exact dynamic group.
+let cachedGroupId: string | undefined;
+
+function mintGroupId(): string {
+  const c = (globalThis as { crypto?: Crypto }).crypto;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  // Fallback for environments without crypto.randomUUID (RFC4122 v4 shape).
+  return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    const v = ch === "8" ? (r & 0x3) | 0x8 : r;
+    return v.toString(16);
+  });
+}
 
 export function readGroupId(): string {
   const env = import.meta.env as Record<string, string | undefined>;
-  return env.VITE_ACS_GROUP_ID ?? DEFAULT_GROUP_ID;
+  if (env.VITE_ACS_GROUP_ID) return env.VITE_ACS_GROUP_ID;
+  if (!cachedGroupId) cachedGroupId = mintGroupId();
+  return cachedGroupId;
 }
 
 export class MockCallController implements CallController {
