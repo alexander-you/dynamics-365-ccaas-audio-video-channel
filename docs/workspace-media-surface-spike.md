@@ -208,6 +208,13 @@ surface), not to try to fix the third-party iframe's permissions.
 
 ## 8. Recommended next implementation step (smallest safe step)
 
+> **⚠️ Outcome update (2026-05-31):** step 1 (the same-origin probe) is **done and conclusive** — see
+> **§11**. Both top-level **and the embedded same-origin app-shell iframe captured camera + microphone
+> successfully**, so Risk #1 (document Permissions-Policy) is **resolved positive**. The plan below is
+> retained for history; the live-validated path is now **PCF code component** (or same-origin web
+> resource / custom page), with remaining validation being **runtime + Microsoft support**, not
+> permissions.
+
 **Recommendation (no pop-out):** move the camera/mic-publishing surface **off the cross-origin
 third-party app tab** and onto a **same-origin / in-DOM Dynamics surface**, validated empirically and
 with Microsoft, in this order:
@@ -304,34 +311,50 @@ a Permissions-Policy block is likely. It never calls ACS, Dataverse data APIs, s
 
 Click **Run capture test** in each and record the diagnostics.
 
-**RESULT (live runs, 2026-05-31).** The top-level test (test 2) was run twice: first with the camera
-held by another process (`NotReadableError`), then again with the camera free — **clean success**. The
-app-shell test (test 1) still needs a live run.
+**RESULT (live runs, 2026-05-31) — CONCLUSIVE.** Both surfaces tested. The decisive **app-shell**
+run (test 1) loads the web resource inside the model-driven app's content **iframe** (`Inside iframe =
+Yes`, `Parent origin = the Dynamics origin`) and **capture succeeded** — proving the embedded,
+same-origin workspace surface is **not** blocked.
 
-| Diagnostic | App-shell (test 1) | Top-level (test 2) |
+| Diagnostic | App-shell — embedded iframe (test 1) | Top-level (test 2) |
 |---|---|---|
-| Inside iframe | _tbd_ | **No** |
-| Permissions-Policy allows camera | _tbd_ | **Yes** |
-| Permissions-Policy allows microphone | _tbd_ | **Yes** |
-| Camera permission | _tbd_ | **granted** |
-| Microphone permission | _tbd_ | **granted** |
-| getUserMedia | _tbd_ | **SUCCESS** |
-| Local preview created | _tbd_ | **Yes** |
-| Permissions Policy blocking | _tbd_ | **No — capture succeeded** |
-| Exact error (name + message) | _tbd_ | _(none — first run was `NotReadableError: Device in use` = device contention; cleared on re-run)_ |
+| Inside iframe | **Yes** | **No** |
+| Parent origin | **`https://demo-contact-center-en.crm4.dynamics.com`** (same origin) | n/a (top-level) |
+| Permissions-Policy allows camera | **Yes** | **Yes** |
+| Permissions-Policy allows microphone | **Yes** | **Yes** |
+| Camera permission | **granted** | **granted** |
+| Microphone permission | **granted** | **granted** |
+| getUserMedia | **SUCCESS** | **SUCCESS** |
+| Local preview created | **Yes** | **Yes** |
+| Permissions Policy blocking | **No — capture succeeded** | **No — capture succeeded** |
+| Exact error (name + message) | _(none)_ | _(none — first run was `NotReadableError: Device in use` = device contention; cleared on re-run)_ |
 
-**Reading of the top-level result (confirmed):** on the same-origin Dynamics origin, a custom HTML
-surface **can fully capture camera + microphone** — `getUserMedia({video,audio})` **succeeded** and a
-**local preview rendered**. The earlier `NotReadableError: Device in use` was pure **device
-contention** (camera held by another tab/app), not a policy denial; freeing the device produced a clean
-success. This is the **opposite** of the cross-origin app-tab (`NotAllowedError: Permission denied`)
-and confirms the Dynamics origin's document policy does **not** disable capture.
+**Conclusion (confirmed):** a **same-origin Dynamics 365 surface — including one hosted inside the
+model-driven app's own content iframe — can fully capture camera + microphone.** `getUserMedia(
+{video,audio})` succeeded, a local preview rendered, and the workspace page's **document-level
+Permissions-Policy delegates camera + microphone to the same-origin child frame** (`Parent origin` is
+the Dynamics origin, `allowsFeature('camera'|'microphone')` = Yes). This is the **opposite** of the
+cross-origin third-party **Application Tab**, which returned `NotAllowedError: Permission denied`.
 
-**One read still needed to close this out:**
-- **Run the app-shell test (test 1)** so the `Inside iframe = Yes` row is filled —
-  `…/main.aspx?pagetype=webresource&webresourceName=alex_acv_capture_probe.html`. This mirrors the real
-  embedded workspace document policy and is the decisive read for **PCF / web-resource-on-a-form**
-  viability. (Free the camera first so contention doesn't mask the result.)
+**This resolves the central unknown of the spike (Risk #1).** The blocker was never "Dynamics disables
+camera/mic" — it was specifically the **cross-origin** third-party app-tab iframe being denied a media
+delegation it cannot self-grant. Any **same-origin / in-DOM** Dynamics surface inherits the host page's
+(permissive) policy and **can publish media**.
+
+**Recommended publishing surface (now evidence-backed, not hypothesis):**
+
+1. **PCF code component** — the product target. It renders directly into the host page DOM/origin (no
+   iframe at all), so it inherits the same permissive policy proven above. Wrap the existing
+   `IMediaSession` / agent panel, bundle the ACS Calling SDK (no `<script src>`). Remaining validation
+   is **runtime** (worker/WASM/bundle-size/destroy-lifecycle + ACS SDK inside PCF), **not** permissions.
+2. **HTML web resource / custom page on a form or tab** — same-origin, already proven to capture; a
+   valid lower-effort host if PCF runtime constraints bite. (Subject to the 5 MB web-resource upload
+   limit vs the ~5.7 MB bundle — may need a custom page or split assets.)
+3. **Cross-origin third-party Application Tab — do NOT use for publishing.** Confirmed blocked; keep it
+   only for non-media context if at all.
+
+The **pop-out window stays rejected** — it is no longer needed now that an embedded same-origin surface
+can capture.
 
 **Interpretation rules (decided in advance, to avoid bias):**
 

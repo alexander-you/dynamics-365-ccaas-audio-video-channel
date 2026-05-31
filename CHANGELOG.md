@@ -25,13 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes (capture probe)
 - **Only one component was added: a single HTML web resource**, additive and unbound. No routing /
   workstream / queue / app-profile / session-template / capacity change, no Azure provisioning, no
-  navigation/template binding. **Demo Contact Center HE untouched.** **Top-level same-origin result
-  (confirmed):** Permissions-Policy allows camera + microphone, both permissions granted, and
-  `getUserMedia({video,audio})` **succeeded with a local preview** (an earlier `NotReadableError:
-  Device in use` was device contention, cleared on re-run) — a same-origin Dynamics surface **can**
-  capture camera/mic, the opposite of the cross-origin app-tab (`NotAllowedError`). Pending the
-  app-shell (iframe) test. Rollback = delete the `webresourceset` record and publish (see spike §11).
-  The pop-out window remains **rejected** (kept only behind `?debug=1`).
+  navigation/template binding. **Demo Contact Center HE untouched.** **CONCLUSIVE result:** capture
+  succeeded **both** top-level **and inside the model-driven app-shell iframe** (`Inside iframe = Yes`,
+  parent = the Dynamics origin) — `getUserMedia({video,audio})` SUCCESS with a local preview, no policy
+  block. A same-origin / in-DOM Dynamics surface **can** capture camera/mic; the blocker was the
+  **cross-origin** third-party Application Tab (`NotAllowedError`). Live-validated publishing path = PCF
+  code component (or same-origin web resource / custom page); remaining validation is runtime +
+  Microsoft support, not permissions. Rollback = delete the `webresourceset` record and publish (see
+  spike §11). The pop-out window remains **rejected** (kept only behind `?debug=1`).
 
 ### Added — Workspace media-surface feasibility spike (read-only; docs only)
 - `docs/workspace-media-surface-spike.md`: read-only spike evaluating which Dynamics 365 workspace

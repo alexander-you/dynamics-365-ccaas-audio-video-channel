@@ -82,13 +82,15 @@ supportability validation. These are first-class workstreams, not afterthoughts.
   `alex_acv_capture_probe.html` was created in **Demo Contact Center EN** (solution
   `alex_visual_engagement_channel`) to empirically test whether a same-origin Dynamics surface gets
   document-level camera/microphone permission. No ACS, no Dataverse writes, no storage/tokens, not
-  bound to navigation or any template. **Top-level same-origin result (confirmed):** Permissions-Policy
-  **allows** camera + microphone, both permissions **granted**, and `getUserMedia({video,audio})`
-  **succeeded with a local preview** (an earlier `NotReadableError: Device in use` was device
-  contention, cleared on re-run). A same-origin Dynamics custom surface **can** capture camera/mic — the
-  **opposite** of the cross-origin app-tab (`NotAllowedError`). Still pending: the **app-shell (iframe)
-  test** to confirm the embedded workspace document policy. See spike §11. **[Validate — top-level
-  confirmed positive, app-shell read pending]**
+  bound to navigation or any template. **CONCLUSIVE result (2026-05-31):** capture succeeded **both**
+  top-level **and inside the model-driven app-shell iframe** (`Inside iframe = Yes`, `Parent origin =`
+  the Dynamics origin) — Permissions-Policy allows camera + microphone, permissions granted,
+  `getUserMedia({video,audio})` **SUCCESS** with a local preview. A same-origin / in-DOM Dynamics
+  surface (incl. the app's own content iframe) **can** capture camera/mic; the blocker was specifically
+  the **cross-origin** third-party Application Tab (`NotAllowedError`). **Live-validated publishing path
+  = PCF code component (or same-origin web resource / custom page); remaining validation is runtime +
+  Microsoft support, not permissions.** See spike §11. **[Confirmed — embedded same-origin capture
+  works]**
 
 ## 6. Co-browsing (future, out of MVP scope)
 
