@@ -382,41 +382,52 @@ conversation-context key (`acsGroupId`) **cannot** be injected declaratively as 
 its own. The supported declarative path requires the slug to be a **recognized session/context
 variable**, which lives at the **session-template** level — not the app-tab level.
 
-#### 10.7.3 Remaining step to close the agent-join loop (needs a live working session)
+#### 10.7.3 Closing the agent-join loop — implemented wiring (approved 2026-05-31)
 
-Closing items 3–5 of the POC (dynamic `acsGroupId` → agent joins same group) requires **one** of:
+The approved approach combines a **cloned session template** (so the OOB template is never edited)
+with a **relay-side correlation lookup** (so no static `acsGroupId` and no unsupported URL slug are
+used). The flow is:
 
-- **A. Session-template context variable (declarative):** create a session template that defines an
-  `acsGroupId` context variable mapped from the conversation context, references the app-tab template,
-  and uses the `{acsGroupId}` slug in the tab URL. This is the most "native" path but needs a session
-  template and (to auto-open) binding to `alex_inbox` — i.e. it **modifies the existing inbox
-  workstream's session behavior**, so it needs explicit approval.
-- **B. Runtime reader (programmatic):** a small **Web Resource** app tab (Dataverse origin) that reads
-  the active conversation's `acsGroupId` via the client session/context API and iframes the hosted
-  panel with `?mode=live&surface=tab&acsGroupId=<resolved>`; **or** the relay stores the
-  `conversationId → acsGroupId` map and the panel looks it up by the active conversation id. No change
-  to `alex_inbox`, but it needs client-API behavior that must be **validated in a live agent session**
-  (the CIF widget frame's access to conversation context could not be runtime-verified here).
+1. **Customer** mints a fresh random `acsGroupId` per call and sends it to the relay `/api/inbound`.
+2. **Relay** (`createConversation`) creates the routed D365 conversation and writes a temporary
+   correlation row `conversationId → acsGroupId` to a Table in the **existing** storage account
+   (no new Azure resource). The table stores **only** the id, `acsGroupId`, `createdOn`, `expiresOn`,
+   `status`, and an optional correlation id — never recordings, transcripts, business metadata,
+   tokens, or secrets. Rows expire (TTL, default 8 h) and a daily timer purges expired rows.
+3. **Session template** `alex_acv_custommessaging_session_poc` (a clone of `msdyn_custommessaging_session`)
+   is bound to the existing `alex_acv_media_tab_poc` application tab. Its tab URL carries a **supported**
+   context-id slug (validated live — see §10.7.6), e.g. `…?mode=live&surface=tab&liveWorkItemId={…}`.
+   The routing workstream **"custom messaging"** points its `msdyn_sessiontemplate_default` at this
+   clone so the tab opens automatically in the agent's session.
+4. **Agent panel** (media stage) reads the supported id from its own URL and calls the relay
+   `GET /api/session?<id>` to resolve the `acsGroupId`, then joins the **same** ACS group. If nothing
+   resolves it stays in the safe waiting state (no static group, no wrong call).
 
-Until one of these is wired, the Visual Engagement tab opens and loads the panel in the **safe waiting
-state** (no static group, no wrong call) — POC validation items 1–2 pass; items 3–6 are pending the
-live step above.
+This needs **no** workstreams, queues, routing rules, skills, capacity profiles, full schema, or new
+Azure resources. The only change to existing behavior is the workstream's session-template default,
+which is fully reversible (§10.7.5).
 
 #### 10.7.4 POC validation checklist (Option A)
 
 | # | Check | Status |
 |---|---|---|
 | 1 | Conversation arrives in the **native** Omnichannel Communication Panel (unchanged) | ✅ (§10.6) |
-| 2 | Visual Engagement **application tab opens / can be opened** in the same session | ⏳ live |
-| 3 | Tab panel receives the **correct dynamic `acsGroupId`** | ⏳ live (needs §10.7.3) |
+| 2 | Visual Engagement **application tab opens** automatically in the same session | ⏳ live |
+| 3 | Tab panel receives the **correct dynamic `acsGroupId`** via relay lookup | ⏳ live |
 | 4 | Agent **joins the same ACS group call** as the customer | ⏳ live |
 | 5 | Customer and agent **see each other** | ⏳ live |
-| 6 | **No static `acsGroupId`** anywhere in the path | ✅ (customer mints per-call GUID; agent has no static fallback) |
+| 6 | **No static `acsGroupId`** anywhere in the path | ✅ (customer mints per-call GUID; agent resolves via relay) |
 
 #### 10.7.5 Rollback
 
+- Set `msdyn_sessiontemplate_default` back to `msdyn_custommessaging_session` on workstream
+  `"custom messaging"` (the single approval-gated change).
+- Remove the app-tab binding from `alex_acv_custommessaging_session_poc` if needed.
+- Delete the cloned session template `alex_acv_custommessaging_session_poc` if needed.
 - Delete `alex_acv_media_tab_poc` (`msdyn_applicationtabtemplate`) — additive, safe.
+- Revert the relay endpoint + mapping-store changes (remove `STORAGE_TABLE_ENDPOINT` /
+  `STORAGE_TABLE_NAME` / `SESSION_MAP_TTL_HOURS` app settings, remove the `Storage Table Data
+  Contributor` role grant, redeploy the prior relay; the table can be deleted).
 - Revert the panel/customer-web PR (single revert); GitHub Pages redeploys the prior build.
-- No session template was bound to `alex_inbox`, so the inbox workstream behavior is unchanged and
-  needs no rollback.
+
 
